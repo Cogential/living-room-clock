@@ -84,6 +84,11 @@ const lv_font_t *ui_font(ui_font_family_t family, int size)
         return LV_FONT_DEFAULT;
     }
 
+    /* The Ubuntu faces have nothing at the LV_SYMBOL_* codepoints, and a widget
+     * such as lv_keyboard mixes letters and symbols under a single font. Tiny
+     * TTF reports those glyphs as missing, so LVGL falls through to this. */
+    font->fallback = ui_symbol_font(size);
+
     s_cache[s_cache_count++] = (font_cache_entry_t){ family, size, font };
     return font;
 }

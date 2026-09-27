@@ -267,10 +267,16 @@ crisp. `ui_font(family, size)` caches instances, so asking twice is free.
 nothing there, so a symbol drawn with `ui_font()` renders as blank - which is how
 the settings gear shipped invisible for a while.
 
-Any label whose text contains a symbol must use `ui_symbol_font()`, which snaps
-to the nearest compiled-in Montserrat. Where a symbol would otherwise be mixed
-into a sentence, the symbol is dropped and the text carries the meaning instead,
-so those labels stay in Ubuntu rather than switching typeface for one glyph.
+`ui_symbol_font()` snaps to the nearest compiled-in Montserrat. Every `ui_font()`
+instance now also carries that Montserrat as its **fallback**, so a symbol inside
+Ubuntu text renders instead of blanking. That is what fixes `lv_keyboard`, whose
+backspace, enter, arrow, OK and close keys share one font with the letters and
+showed as empty boxes in the Wi-Fi password sheet.
+
+A label that is *only* a symbol still uses `ui_symbol_font()` directly, so the
+icon sits on the Montserrat baseline rather than borrowing Ubuntu's metrics.
+Where a symbol would otherwise be mixed into a sentence, the symbol is dropped
+and the text carries the meaning instead.
 
 ## Performance notes
 
