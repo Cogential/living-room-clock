@@ -1,0 +1,21 @@
+# Doom's static data is large enough to starve internal RAM.
+#
+# libdoomgeneric.a contributes ~240 KB of .bss. Linked normally that sits in
+# internal DRAM permanently - even while the clock is running and Doom is not -
+# which left DIRAM 95% full with 21 KB free, too little for esp_psram to reserve
+# its internal/DMA pool, and the board boot-looped on:
+#   E main_task: Could not reserve internal/DMA pool (error 0x101)
+#
+# The stock `extram_bss` scheme only moves sections already tagged with
+# EXT_RAM_BSS_ATTR, so it does nothing for third-party source we do not want to
+# edit. This scheme redirects the ordinary .bss instead. None of it is DMA'd to,
+# so PSRAM is fine; there is 128 MB of address space and it is barely used.
+[scheme:doom_extram_bss]
+entries:
+    bss -> extern_ram
+    common -> extern_ram
+
+[mapping:doomgeneric]
+archive: libdoomgeneric.a
+entries:
+    * (doom_extram_bss)

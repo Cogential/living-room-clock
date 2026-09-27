@@ -1,0 +1,32 @@
+menu "Living Room Clock"
+
+    config CLOCK_WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+        help
+            Wi-Fi network the clock joins for time sync. Leave empty to skip
+            Wi-Fi entirely; the clock still runs off the RTC.
+
+    config CLOCK_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+
+    config CLOCK_NTP_SERVER
+        string "NTP server"
+        default "pool.ntp.org"
+
+    config CLOCK_TIMEZONE
+        string "POSIX timezone string"
+        default "EST5EDT,M3.2.0,M11.1.0"
+        help
+            POSIX TZ string, including DST rules. Examples:
+              UK           GMT0BST,M3.5.0/1,M10.5.0
+              US Eastern   EST5EDT,M3.2.0,M11.1.0
+              US Pacific   PST8PDT,M3.2.0,M11.1.0
+              Central EU   CET-1CEST,M3.5.0,M10.5.0/3
+
+    config CLOCK_24_HOUR
+        bool "Use 24-hour time"
+        default y
+
+endmenu

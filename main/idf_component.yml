@@ -1,0 +1,26 @@
+## IDF Component Manager Manifest File
+dependencies:
+  waveshare/esp32_p4_wifi6_touch_lcd_7b:
+    # 3.0.1 is the current stable BSP; it pulls in the EK79007 panel driver,
+    # GT911 touch and esp_lvgl_adapter transitively.
+    version: "==3.0.1"
+
+  lvgl/lvgl:
+    # Pinned to match what the BSP's esp_lvgl_adapter ~0.6 line expects.
+    version: "==9.5.0"
+    public: true
+
+  # Wi-Fi on the P4 is proxied to the onboard ESP32-C6 over SDIO.
+  espressif/esp_wifi_remote:
+    version: "==1.2.5"
+  espressif/esp_hosted:
+    version: "1.4.*"
+
+  # USB HID host: the board's USB-A port is a real host, and a DualSense plugged
+  # in by cable enumerates as a standard HID gamepad. Bluetooth is not an option
+  # for it - the C6 has no Classic BR/EDR.
+  espressif/usb_host_hid:
+    version: "^1.0.4"
+
+  idf:
+    version: ">=5.3"

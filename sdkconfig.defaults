@@ -1,0 +1,113 @@
+CONFIG_IDF_TARGET="esp32p4"
+# This board carries pre-v3 P4 silicon (reported v1.3), so the stock Waveshare
+# "postv3" defaults refuse to boot. Allow the older revision range instead.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+CONFIG_BOOTLOADER_LOG_LEVEL=2
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# 32 MB of stacked PSRAM at full speed: this is what lets us keep large
+# framebuffers plus the runtime-rendered glyph cache without juggling.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+CONFIG_CACHE_L2_CACHE_256KB=y
+CONFIG_CACHE_L2_CACHE_LINE_128B=y
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
+CONFIG_FREERTOS_HZ=1000
+
+# Console on the native USB-JTAG port, so one cable does both flashing and logs.
+# The CH34x bridge that carries UART0 is a second cable that can come loose, and
+# opening it also drives the board's auto-reset circuit.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Save panic backtraces to flash. A crash inside Doom reboots the board and the
+# backtrace scrolls past unseen; this keeps it for `idf.py coredump-info`.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+
+# Wi-Fi lives on the C6 over SDIO, we never run an AP here.
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
+CONFIG_ESP_WIFI_REMOTE_LIBRARY_HOSTED=y
+
+# Take the NTP server from DHCP when the router offers one, falling back to the
+# configured pool. Without this, esp_netif_sntp_init() refuses the whole config
+# and time sync silently never starts.
+CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+
+# BLE: the host stack runs on the P4, the controller is the C6, and HCI is
+# tunnelled over the same hosted transport. The C6 has no Classic BR/EDR at all,
+# so NimBLE (BLE-only) is the right host and A2DP/audio profiles are impossible.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_DISABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_TRANSPORT_UART=n
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
+
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_STRING=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_OS_FREERTOS=y
+CONFIG_LV_DEF_REFR_PERIOD=15
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
+
+# Tiny TTF renders the embedded Ubuntu faces at arbitrary pixel sizes, which is
+# what keeps a 200 px clock crisp instead of a scaled-up bitmap font.
+CONFIG_LV_USE_TINY_TTF=y
+CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
+CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT=64
+CONFIG_LV_USE_FLOAT=y
+
+# Bitmap cache stays off. Raising it made no measurable difference to frame
+# times (Tiny TTF's own glyph cache above is what matters), and because
+# SPIRAM_MALLOC_ALWAYSINTERNAL keeps sub-16 KB allocations in internal RAM, the
+# small glyphs from the settings pages filled internal memory until the SDIO
+# driver could not get a buffer and asserted. Leave it at 0.
+CONFIG_LV_CACHE_DEF_SIZE=0
+
+# Wi-Fi, BLE and the SDIO link to the C6 all need DMA-capable internal memory.
+# Keep a larger floor so a busy UI cannot starve the transport.
+# Raised from 64 KB: the SDIO transport asserts outright rather than failing
+# softly when it cannot get a DMA buffer, so it needs real headroom.
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=98304
+
+# Send almost everything to PSRAM. At the 16 KB default, every LVGL object,
+# style and font-cache entry is small enough to stay in internal RAM: walking
+# the settings pages drove free internal memory from ~98 KB down to ~15 KB and
+# the SDIO driver asserted when it could not get a buffer. Drivers that truly
+# need internal or DMA memory request it explicitly by capability, so they are
+# unaffected. There is 32 MB of PSRAM and it is barely touched.
+# 0: no size is preferred-internal, so every malloc() tries PSRAM first and
+# only falls back to internal if PSRAM is full.
+#
+# At 64 bytes, allocations under that were forced into internal RAM. Doom's
+# R_Init makes thousands of small ones while composing textures, which drove
+# free internal memory to ~19 KB and then spent minutes searching a nearly-full,
+# fragmented internal heap for each one - R_Init never finished, and the task
+# watchdog fired continuously. Earlier it also starved the SDIO driver into
+# asserting. PSRAM has 27 MB free and is barely fragmented.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0
+
+# Lets components opt their .bss into PSRAM via a linker fragment. Doom uses it;
+# see components/doomgeneric/linker.lf for why.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_24=y

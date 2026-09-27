@@ -1,0 +1,11 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, ,        8M,
+# Sized to the WAD (4.2 MB) plus headroom rather than filling the flash:
+# a 7 MB image is 7 MB to write, and the long transfer was the part that
+# kept failing. Saves and config also live here.
+storage,  data, spiffs,  ,        5M,
+# Panic backtraces survive the reboot here, which is the only way to see a
+# crash that happens while nobody is watching the console.
+coredump, data, coredump, ,       64K,
