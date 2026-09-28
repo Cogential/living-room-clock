@@ -30,6 +30,13 @@ typedef struct {
     lv_obj_t *(*create)(lv_obj_t *parent);
     /** Called ~30x/second while this face is active. */
     void (*tick)(const clock_time_t *now);
+    /**
+     * Optional. A short tap that no chrome button claimed, in screen
+     * coordinates. The chrome layer sits above every face and receives all
+     * touches, so this is the only way a face sees one. NULL for the purely
+     * decorative faces, which is most of them.
+     */
+    void (*tap)(int x, int y);
 } clock_face_t;
 
 /* The registered faces, in the order they appear in the picker. */

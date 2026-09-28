@@ -1,23 +1,26 @@
 /*
- * Dashboard - the plainest presentation of the shared data bands: a quiet
- * gradient, the clock in the middle, and nothing else competing with it.
+ * Dashboard - the plainest HUD: a quiet navy gradient, rounded glass panels and
+ * soft accents, nothing competing with the information.
  */
-#include <stdio.h>
-
 #include "ui/ui.h"
-#include "ui/ui_bands.h"
-#include "ui/ui_fonts.h"
+#include "ui/ui_hud.h"
 #include "ui/ui_theme.h"
 
-#define INK    0xF2F5FA
-#define DIM    0x8B95A7
-#define ACCENT 0x7DD3FC
+#define INK   0xF2F5FA
+#define DIM   0x8B95A7
+#define SKY   0x7DD3FC
 
-static ui_bands_t s_bands;
-static lv_obj_t *s_time;
-static lv_obj_t *s_date;
-static int s_last_minute = -1;
-static int s_last_yday = -1;
+static const ui_hud_theme_t THEME = {
+    .ink = INK, .dim = DIM,
+    .panel = 0x111831, .panel_opa = LV_OPA_80,
+    .border_w = 1, .border_opa = LV_OPA_40, .radius = 12,
+    .weather = SKY, .news = 0xF472B6, .hn = 0xFB923C, .markets = 0xA78BFA,
+    .up = 0x4ADE80, .down = 0xF87171,
+    .tag_prefix = "", .tag_family = UI_FONT_MEDIUM,
+    .clock_family = UI_FONT_THIN, .clock = INK, .clock_align = LV_TEXT_ALIGN_CENTER,
+    .date_family = UI_FONT_MEDIUM, .date = SKY,
+    .secs_style = HUD_SECS_BAR, .secs = SKY, .secs_track = DIM, .secs_track_opa = LV_OPA_20,
+};
 
 static lv_obj_t *dashboard_create(lv_obj_t *parent)
 {
@@ -26,26 +29,14 @@ static lv_obj_t *dashboard_create(lv_obj_t *parent)
     ui_set_gradient(root, lv_color_hex(0x0B1020), lv_color_hex(0x141A2E));
     ui_add_glow(root, lv_color_hex(0x3B82F6), 560, -200, -260, LV_OPA_10);
 
-    s_time = ui_face_time_label(root, UI_FONT_THIN, FACE_TIME_THIN, INK);
-    s_date = ui_face_date_label(root, DIM);
-
-    const ui_bands_palette_t palette = { .ink = INK, .dim = DIM, .accent = ACCENT };
-    ui_bands_create(&s_bands, root, &palette);
-
-    s_last_minute = -1;
-    s_last_yday = -1;
+    ui_hud_create(root, &THEME);
     return root;
-}
-
-static void dashboard_tick(const clock_time_t *now)
-{
-    ui_face_update_time(s_time, s_date, now, &s_last_minute, &s_last_yday);
-    ui_bands_tick(&s_bands);
 }
 
 const clock_face_t face_dashboard = {
     .name = "Dashboard",
     .light_chrome = true,
     .create = dashboard_create,
-    .tick = dashboard_tick,
+    .tick = ui_hud_tick,
+    .tap = ui_hud_tap,
 };

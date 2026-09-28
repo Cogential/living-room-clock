@@ -1,19 +1,25 @@
 /*
- * Minimal - warm paper and hairline ink. The one that reads in daylight, and
- * the quietest setting for the shared data bands.
+ * Minimal - warm paper and hairline ink. The one that reads in daylight: white
+ * paper panels, muted section colours, thin numerals.
  */
 #include "ui/ui.h"
-#include "ui/ui_bands.h"
-#include "ui/ui_fonts.h"
+#include "ui/ui_hud.h"
 #include "ui/ui_theme.h"
 
-#define INK    0x1A1917
-#define DIM    0x9A958C
-#define ACCENT 0x7A736A
+#define INK  0x1A1917
+#define DIM  0x7D786F
 
-static ui_bands_t s_bands;
-static lv_obj_t *s_time, *s_date;
-static int s_last_minute = -1, s_last_yday = -1;
+static const ui_hud_theme_t THEME = {
+    .ink = INK, .dim = DIM,
+    .panel = 0xFFFFFF, .panel_opa = LV_OPA_70,
+    .border_w = 1, .border_opa = LV_OPA_40, .radius = 0,
+    .weather = 0x3E6A9E, .news = 0xB5533C, .hn = 0xC0842B, .markets = 0x5E7D4A,
+    .up = 0x2E7D32, .down = 0xC62828,
+    .tag_prefix = "", .tag_family = UI_FONT_MEDIUM,
+    .clock_family = UI_FONT_THIN, .clock = INK, .clock_align = LV_TEXT_ALIGN_CENTER,
+    .date_family = UI_FONT_MEDIUM, .date = DIM,
+    .secs_style = HUD_SECS_BAR, .secs = INK, .secs_track = 0x9A958C, .secs_track_opa = LV_OPA_30,
+};
 
 static lv_obj_t *minimal_create(lv_obj_t *parent)
 {
@@ -21,31 +27,14 @@ static lv_obj_t *minimal_create(lv_obj_t *parent)
     ui_make_layer(root);
     ui_set_gradient(root, lv_color_hex(0xFBFAF7), lv_color_hex(0xEFEDE7));
 
-    /* Two hairlines bracket the clock and mark where the face's own space
-     * begins and ends. */
-    ui_add_rect(root, 300, UI_BAND_FACE_TOP - 4, 424, 1, 0xD8D3CA, LV_OPA_COVER, 0);
-    ui_add_rect(root, 300, UI_BAND_FACE_BOTTOM, 424, 1, 0xD8D3CA, LV_OPA_COVER, 0);
-
-    s_time = ui_face_time_label(root, UI_FONT_THIN, FACE_TIME_THIN, INK);
-    lv_obj_set_style_text_letter_space(s_time, -3, 0);
-    s_date = ui_face_date_label(root, DIM);
-
-    const ui_bands_palette_t palette = { .ink = INK, .dim = DIM, .accent = ACCENT };
-    ui_bands_create(&s_bands, root, &palette);
-
-    s_last_minute = -1; s_last_yday = -1;
+    ui_hud_create(root, &THEME);
     return root;
-}
-
-static void minimal_tick(const clock_time_t *now)
-{
-    ui_face_update_time(s_time, s_date, now, &s_last_minute, &s_last_yday);
-    ui_bands_tick(&s_bands);
 }
 
 const clock_face_t face_minimal = {
     .name = "Minimal",
     .light_chrome = false,
     .create = minimal_create,
-    .tick = minimal_tick,
+    .tick = ui_hud_tick,
+    .tap = ui_hud_tap,
 };

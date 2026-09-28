@@ -1,5 +1,5 @@
 /*
- * Photo - a picture behind the clock.
+ * Photo - a picture behind the HUD.
  *
  * The image is stored as raw RGB565 at exactly panel size and resolution, so
  * LVGL blits it straight out of flash with no decode step and no PSRAM copy.
@@ -10,8 +10,7 @@
  * To swap the picture, re-run the conversion in the README and rebuild.
  */
 #include "ui/ui.h"
-#include "ui/ui_bands.h"
-#include "ui/ui_fonts.h"
+#include "ui/ui_hud.h"
 #include "ui/ui_theme.h"
 
 /* Embedded by EMBED_FILES in main/CMakeLists.txt. */
@@ -32,15 +31,24 @@ static const lv_image_dsc_t s_photo = {
     .data = photo_start,
 };
 
-/* Brighter than the other faces' secondary tones: with no scrim underneath, a
- * mid grey disappears into foliage. */
-#define INK    0xFFFFFF
-#define DIM    0xE4EAF0
-#define ACCENT 0xBFEEFF
-
-static ui_bands_t s_bands;
-static lv_obj_t *s_time, *s_date;
-static int s_last_minute = -1, s_last_yday = -1;
+/*
+ * Dark glass panels carry the feeds, so the photo shows in the gaps and behind
+ * the clock. The clock itself sits on the picture with a per-glyph shadow, which
+ * keeps the darkening tight around the glyphs instead of a slab over the photo.
+ */
+static const ui_hud_theme_t THEME = {
+    .ink = 0xFFFFFF, .dim = 0xD5DEE6,
+    .panel = 0x000000, .panel_opa = LV_OPA_50,
+    .border_w = 1, .border_opa = LV_OPA_50, .radius = 12,
+    .weather = 0x7DD3FC, .news = 0xFDA4AF, .hn = 0xFDBA74, .markets = 0xFDE68A,
+    .up = 0x86EFAC, .down = 0xFCA5A5,
+    .tag_prefix = "", .tag_family = UI_FONT_MEDIUM,
+    .clock_family = UI_FONT_THIN, .clock = 0xFFFFFF, .clock_align = LV_TEXT_ALIGN_CENTER,
+    .text_shadow = true,
+    .date_family = UI_FONT_MEDIUM, .date = 0xFFFFFF,
+    .secs_style = HUD_SECS_BAR, .secs = 0xFFFFFF, .secs_track = 0x000000,
+    .secs_track_opa = LV_OPA_40,
+};
 
 static lv_obj_t *photo_create(lv_obj_t *parent)
 {
@@ -51,40 +59,14 @@ static lv_obj_t *photo_create(lv_obj_t *parent)
     lv_image_set_src(img, &s_photo);
     lv_obj_set_pos(img, 0, 0);
 
-    /*
-     * Nothing is drawn over the photo - no scrims, no tint. The picture is the
-     * point of this face, and a translucent slab across the top and bottom reads
-     * as a black border rather than as a background.
-     *
-     * All of the legibility therefore comes from the text itself, via a per-glyph
-     * drop shadow. That keeps the darkening tight around the glyphs, where it
-     * does the work, instead of spread over a third of the panel.
-     */
-    s_time = ui_face_time_label(root, UI_FONT_THIN, FACE_TIME_THIN, INK);
-    ui_text_shadow(s_time, 8);
-
-    s_date = ui_face_date_label(root, INK);
-    ui_text_shadow(s_date, 5);
-
-    const ui_bands_palette_t palette = {
-        .ink = INK, .dim = DIM, .accent = ACCENT, .shadow = true,
-    };
-    ui_bands_create(&s_bands, root, &palette);
-
-    s_last_minute = -1;
-    s_last_yday = -1;
+    ui_hud_create(root, &THEME);
     return root;
-}
-
-static void photo_tick(const clock_time_t *now)
-{
-    ui_face_update_time(s_time, s_date, now, &s_last_minute, &s_last_yday);
-    ui_bands_tick(&s_bands);
 }
 
 const clock_face_t face_photo = {
     .name = "Photo",
     .light_chrome = true,
     .create = photo_create,
-    .tick = photo_tick,
+    .tick = ui_hud_tick,
+    .tap = ui_hud_tap,
 };

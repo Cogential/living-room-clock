@@ -16,8 +16,18 @@ extern "C" {
  * so a slow or failed request never stalls a frame.
  */
 
-#define API_NEWS_MAX   6
+/* Everything the feeds return (18 news, 20 HN today), so the headline cards
+ * have stories to step forward through. In PSRAM, so size is cheap. */
+#define API_NEWS_MAX   20
 #define API_QUOTE_MAX  4
+
+/*
+ * Article links, for the QR code a headline card shows when tapped. Measured
+ * against the live feeds: news links reach ~104 chars and HN ~130. A link that
+ * does not fit is dropped rather than truncated - a cut-off URL would encode a
+ * QR code that leads nowhere.
+ */
+#define API_URL_MAX    200
 
 typedef struct {
     bool     ok;
@@ -42,6 +52,7 @@ typedef struct {
          * ~54 (some are full publication names, not short codes). */
         char title[120];
         char source[64];
+        char url[API_URL_MAX];     /* empty if missing or too long */
     } items[API_NEWS_MAX];
 } api_news_t;
 
@@ -52,7 +63,7 @@ typedef struct {
  * comment counts that the headline feed has no equivalent for, and the UI shows
  * them in their own slot.
  */
-#define API_HN_MAX 6
+#define API_HN_MAX 20
 
 typedef struct {
     bool     ok;
@@ -65,6 +76,9 @@ typedef struct {
         /* -1 when the feed reports null, which happens on "job" posts. */
         int  score;
         int  comments;
+        /* The linked article. Text posts (Ask HN) link nowhere else, so for
+         * those this is the story's own page on HN. */
+        char url[API_URL_MAX];
     } items[API_HN_MAX];
 } api_hn_t;
 

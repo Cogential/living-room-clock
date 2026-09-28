@@ -90,54 +90,58 @@ wire a passive speaker to it and drive it via `bsp_audio_codec_speaker_init()`.
 
 ## The faces
 
-Eleven of them, chosen in **Settings -> Clock face** only. **Every face shows
-the same live data**, in the same places - only the styling changes. The clock area
-itself carries no face switcher: nothing to fat-finger on a wall clock, and
-nothing to accidentally swipe past.
+Thirteen of them, chosen in **Settings -> Clock face**. **Every face is the same
+HUD** - clock top left, then a panel per feed - and only the styling changes, so
+information is always in the same place. The clock area carries no face
+switcher: nothing to fat-finger on a wall clock.
 
 **Pip-Boy** is the default on a fresh install.
 
 | Face | Look |
 |---|---|
-| **Aurora** | Midnight gradient, coloured bloom, hairline seconds ring. Default. |
-| **Minimal** | Warm paper, near-black hairline type. The one that reads in daylight. |
-| **Cyberpunk** | Hazard yellow on black, cyan brackets, magenta ghost offset behind the numerals. |
-| **Outrun** | Sunset, banded sun, perspective grid running to the horizon. |
-| **Pip-Boy** | Green phosphor CRT, monospace readouts, blinking block cursor. |
-| **Rapture** | Art deco under the sea: brass on oxidised teal, stepped ziggurats. |
-| **Stardew** | Wooden sign over a green field. Dates read "Spring 12", not 12/04. |
-| **Tavern** | Ink on parchment, roman numeral hour, wax seal counting seconds. |
-| **Blockcraft** | Daylight over a grass line, everything on a 32 px grid, hard pixel shadow. |
-| **Aperture** | Clean test-chamber signage; two portal-coloured bars fill the minute. |
-| **Hyrule** | Gold on forest green, triangle motif, gold seconds ring. |
-| **Cuckoo** | Carved chalet. Pendulum swings continuously; the bird comes out on the hour and at :30, and once when the face is opened. Change the `tm_min == 0 \|\| tm_min == 30` test in `face_cuckoo.c` to make it hourly only. |
+| **Dashboard** | Navy gradient, rounded glass panels, thin numerals. The plainest. |
+| **Photo** | The embedded picture behind dark glass panels; the clock sits on the photo with a per-glyph shadow. |
+| **Minimal** | Warm paper, white panels, muted section colours. The one that reads in daylight. |
+| **Cyberpunk** | Hazard yellow on black, magenta ghost behind the numerals, `//` headings, scanlines in the gaps. |
+| **Outrun** | Violet panels, a half-transparent banded sun sinking behind the clock onto a neon horizon. |
+| **Pip-Boy** | Green phosphor, monochrome - sections told apart by `>` headings, not colour; amber only for a falling price. Blinking block cursor. |
+| **Rapture** | Art deco under the sea: brass-edged square panels on oxidised teal, a stepped ziggurat above the clock. |
+| **Stardew** | Wooden boards on a green field; the clock is carved into a sign. Dates read "Fall 28", not 28/09. |
+| **Tavern** | Ink on parchment. Roman numeral hour leads the date, an ornate rule beneath, a wax seal counting seconds. |
+| **Blockcraft** | Sky, blocky clouds, a strip of turf; stone panels with a hard offset shadow instead of a blur. |
+| **Aperture** | White signage plates on a seamed wall; two portal-coloured bars close on the middle as the minute runs out. |
+| **Hyrule** | Gold on forest green, a small triangle motif over the clock. |
+| **Cuckoo** | Carved case beside a left-aligned clock. Pendulum swings continuously; the bird comes out on the hour and at :30, and once when the face is opened. Change the `tm_min == 0 \|\| tm_min == 30` test in `face_cuckoo.c` to make it hourly only. |
 
-Faces are decorative only - nothing inside one is tappable, so a swipe anywhere
-changes face and never catches on a widget.
+## The HUD
 
-## Data bands
-
-`ui/ui_bands.c` owns the layout every face shares, so information is always in
-the same place:
+`ui/ui_hud.c` owns the layout every face shares:
 
 ```
-  64 ..160   weather      temp, conditions, feels/humidity/wind/AQI, sun, 3-day
- 168 ..400   the face     its clock and whatever artwork it wants
- 410 ..514   headlines    two stories with sources
- 540 ..576   ticker       stocks, BTC, Fear & Greed - scrolling
+    0..262   clock column (x 20..600)  time, date, seconds
+                weather panel (x 616..1004)  temp, conditions, feels/humidity/
+                                             wind/AQI, sunrise/sunset, 3-day
+  278..440   news card  |  Hacker News card   headline wraps to three lines
+  456..584   five market cells                 price, change in up/down colour
 ```
 
-Faces pass a three-colour palette and otherwise get the bands for free. Two
-rules keep bands from colliding: headlines are **clipped, not wrapped**
-(`LV_LABEL_LONG_DOT` in a fixed slot - titles reach ~94 characters), and the
-ticker **scrolls rather than wraps**. Backgrounds and glows may span the whole
-panel, but anything opaque must stay between `UI_BAND_FACE_TOP` and
-`UI_BAND_FACE_BOTTOM` - which is why the analog dial and the cuckoo chalet are
-smaller than they once were.
+A face passes a `ui_hud_theme_t` - text colours, panel fill/border/radius/shadow,
+one accent per section, clock family and colour, an optional ghost duplicate,
+an optional date formatter, and a seconds style (bar, two closing bars, or none)
+- and draws its own artwork: the background before `ui_hud_create()`, anything
+that must sit over the panels after it. Free space for artwork is the clock
+column around the digits (y ~26..178), the gutters, and anything behind the
+translucent panels.
 
-`ui_face_time_label()` / `ui_face_date_label()` / `ui_face_update_time()` place
-the clock consistently too, so a face supplies a typeface and a colour rather
-than its own geometry.
+Headlines are **clipped, not wrapped** past three lines (`LV_LABEL_LONG_DOT` in a
+fixed slot), and every value that could grow - prices, forecast, sources - is
+clipped rather than allowed to wrap into its neighbour.
+
+**Tapping a headline card shows its article as a QR code** (`ui/qr_sheet.c`),
+so it can be read on a phone - the clock has no browser and cannot usefully
+have one. The chrome layer sits above every face and takes all touches, so it
+forwards short taps on empty background to the face's optional `tap(x, y)`;
+faces set `.tap = ui_hud_tap`. The sheet closes on any tap or after a minute.
 
 ## Food
 
@@ -224,8 +228,9 @@ off the panel beats trying to catch a serial capture at the moment of a tap.
 
 ### Adding a face
 
-1. Copy a file in `ui/faces/`, implement `create()` and `tick()`, and export a
-   `const clock_face_t`.
+1. Copy a file in `ui/faces/`: define a `ui_hud_theme_t`, draw any background
+   art in `create()` around `ui_hud_create()`, and export a `const clock_face_t`
+   with `.tick = ui_hud_tick` (or your own that calls it) and `.tap = ui_hud_tap`.
 2. Declare it in `ui/ui.h` and add it to `s_faces[]` in `ui/ui.c`.
 3. Add the source to `main/CMakeLists.txt`.
 

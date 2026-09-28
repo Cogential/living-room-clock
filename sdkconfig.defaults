@@ -69,6 +69,8 @@ CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
 # Tiny TTF renders the embedded Ubuntu faces at arbitrary pixel sizes, which is
 # what keeps a 200 px clock crisp instead of a scaled-up bitmap font.
 CONFIG_LV_USE_TINY_TTF=y
+# Headline cards show a QR code of the article link when tapped.
+CONFIG_LV_USE_QRCODE=y
 CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
 CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT=64
 CONFIG_LV_USE_FLOAT=y

@@ -36,15 +36,15 @@ typedef enum {
  * The clock itself. Both families are the same nominal size so a mono face and
  * a thin face read as the same size on the wall - keep them equal.
  *
- * 210 is as large as the stacked layout allows: at this size "12:34" spans
- * x 250..774 and the tallest family (thin, 1.149x line height) fills
- * UI_BAND_TIME_Y..399, leaving the date and the news band clear by a few
- * pixels. Going bigger means moving the bands in ui_bands.h first.
+ * 210 is as large as the HUD's clock column allows: "12:34" is ~525 px wide in
+ * a 580 px column, and the digits span y ~26..178 above the date. See the
+ * geometry in ui_hud.h before going bigger.
  */
 #define FACE_TIME_THIN 210   /* UI_FONT_THIN */
 #define FACE_TIME_MONO 210   /* UI_FONT_MONO */
 
 #define FACE_MONO_XL  190   /* UI_FONT_MONO  */
+#define FACE_MONO_M    48   /* UI_FONT_MONO - HUD readouts: temperature, prices */
 #define FACE_LABEL_L   34   /* UI_FONT_MEDIUM */
 
 /**

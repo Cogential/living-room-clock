@@ -456,6 +456,15 @@ static void chrome_input_cb(lv_event_t *e)
         /* Faces are chosen in Settings only, so a swipe just wakes the chrome
          * rather than cycling the list under the user. */
         chrome_wake();
+        return;
+    }
+
+    /* SHORT_CLICKED, not CLICKED: a long press or a brush past the screen
+     * should not act on whatever the face has under the finger. */
+    if (code == LV_EVENT_SHORT_CLICKED && s_face && s_face->tap && !ui_app_open()) {
+        lv_point_t p;
+        lv_indev_get_point(lv_indev_active(), &p);
+        s_face->tap(p.x, p.y);
     }
 }
 
@@ -687,9 +696,8 @@ static void build_setup_banner(lv_obj_t *parent)
  * Previous / next face, bottom left.
  *
  * Chrome, so it fades out with the status bar rather than sitting over the
- * clock. It does overlap the left end of the market ticker while visible,
- * hence the backdrop - eight seconds of a translucent pill over the start of
- * the ticker is a better trade than moving a band every face depends on.
+ * clock. It does overlap the first market cell of the HUD while visible - eight
+ * seconds over one price is a better trade than shrinking every face's layout.
  */
 static void build_nav(lv_obj_t *parent)
 {
@@ -740,6 +748,7 @@ void ui_start(void)
     lv_obj_add_flag(top, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(top, chrome_input_cb, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(top, chrome_input_cb, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(top, chrome_input_cb, LV_EVENT_SHORT_CLICKED, NULL);
 
     build_status_bar(top);
     build_nav(top);

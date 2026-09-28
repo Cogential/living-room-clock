@@ -6,6 +6,7 @@
 
 #include "app_settings.h"
 #include "cJSON.h"
+#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
@@ -43,8 +44,10 @@ static const char *WATCHLIST[] = { "AAPL", "MSFT", "NVDA" };
 
 static SemaphoreHandle_t s_lock;
 static api_weather_t s_weather;
-static api_news_t s_news;
-static api_hn_t s_hn;
+/* Headline structs live in PSRAM: with URLs they are ~2 KB apiece, and internal
+ * RAM is the budget Wi-Fi, BLE and USB host all compete for. */
+EXT_RAM_BSS_ATTR static api_news_t s_news;
+EXT_RAM_BSS_ATTR static api_hn_t s_hn;
 static api_markets_t s_markets;
 static volatile uint32_t s_generation;
 static const char *s_status = "Idle";
@@ -136,6 +139,17 @@ static void copy_str(char *dst, size_t dst_len, const cJSON *obj, const char *ke
 {
     const cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
     if (cJSON_IsString(v) && v->valuestring) {
+        strlcpy(dst, v->valuestring, dst_len);
+    } else {
+        dst[0] = '\0';
+    }
+}
+
+/* All or nothing: a truncated URL is worse than none. */
+static void copy_url(char *dst, size_t dst_len, const cJSON *obj, const char *key)
+{
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (cJSON_IsString(v) && v->valuestring && strlen(v->valuestring) < dst_len) {
         strlcpy(dst, v->valuestring, dst_len);
     } else {
         dst[0] = '\0';
@@ -310,7 +324,10 @@ static bool fetch_news(void)
         return false;
     }
 
-    api_news_t n = { 0 };
+    /* Static rather than on the task stack: with URLs this is ~2.3 KB, and only
+     * the api task ever runs this. In PSRAM, like s_news. */
+    EXT_RAM_BSS_ATTR static api_news_t n;
+    memset(&n, 0, sizeof(n));
     const cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
     const cJSON *item = NULL;
     cJSON_ArrayForEach(item, items) {
@@ -319,6 +336,7 @@ static bool fetch_news(void)
         }
         copy_str(n.items[n.count].title, sizeof(n.items[n.count].title), item, "title");
         copy_str(n.items[n.count].source, sizeof(n.items[n.count].source), item, "source");
+        copy_url(n.items[n.count].url, sizeof(n.items[n.count].url), item, "link");
         if (n.items[n.count].title[0]) {
             n.count++;
         }
@@ -340,7 +358,7 @@ static bool fetch_news(void)
 static bool fetch_hn(void)
 {
     /* The gateway ignores ?limit and always returns 20; at ~6 KB that is well
-     * inside RESPONSE_MAX, so take the first API_HN_MAX and drop the rest. */
+     * inside RESPONSE_MAX. API_HN_MAX keeps all of them. */
     char *body = api_get("/hn/top");
     if (body == NULL) {
         return false;
@@ -352,7 +370,8 @@ static bool fetch_hn(void)
         return false;
     }
 
-    api_hn_t h = { 0 };
+    EXT_RAM_BSS_ATTR static api_hn_t h;  /* see fetch_news */
+    memset(&h, 0, sizeof(h));
     const cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
     const cJSON *item = NULL;
     cJSON_ArrayForEach(item, items) {
@@ -363,6 +382,10 @@ static bool fetch_hn(void)
         /* "job" posts carry a null comment count, so -1 means "do not show". */
         h.items[h.count].score    = get_int(item, "score", -1);
         h.items[h.count].comments = get_int(item, "comments", -1);
+        copy_url(h.items[h.count].url, sizeof(h.items[h.count].url), item, "url");
+        if (h.items[h.count].url[0] == '\0') {
+            copy_url(h.items[h.count].url, sizeof(h.items[h.count].url), item, "hn_url");
+        }
         if (h.items[h.count].title[0]) {
             h.count++;
         }
