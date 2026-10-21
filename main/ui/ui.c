@@ -424,10 +424,19 @@ static void nav_cb(lv_event_t *e)
     ui_show_face(next);
 }
 
+/* ui_open_app() has already hidden the chrome and stopped the tick by the time
+ * the launch can fail, and nothing else would ever close the app again. */
+static void launch_doom_from_dock(void)
+{
+    if (!games_ui_launch_doom()) {
+        ui_close_app();
+    }
+}
+
 static void doom_btn_cb(lv_event_t *e)
 {
     (void)e;
-    ui_open_app(games_ui_launch_doom);
+    ui_open_app(launch_doom_from_dock);
 }
 
 static void settings_btn_cb(lv_event_t *e)

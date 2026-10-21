@@ -139,11 +139,11 @@ static void doom_task(void *arg)
     vTaskDelete(NULL);
 }
 
-void games_ui_launch_doom(void)
+bool games_ui_launch_doom(void)
 {
     if (!app_doom_available()) {
         ESP_LOGE(TAG, "doom1.wad missing");
-        return;
+        return false;
     }
 
     /*
@@ -157,7 +157,9 @@ void games_ui_launch_doom(void)
      */
     if (xTaskCreate(doom_task, "doom", 16384, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE(TAG, "could not start doom: no internal RAM for the stack");
+        return false;
     }
+    return true;
 }
 
 static void launch_cb(lv_event_t *e)

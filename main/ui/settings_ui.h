@@ -25,7 +25,7 @@ void settings_ui_open_games(void);
  * Shared by the settings page's Play button and the toolbar icon, so both
  * paths take the same route in and the same route back out.
  */
-void games_ui_launch_doom(void);
+bool games_ui_launch_doom(void);
 
 /** Slide `page` in from the right (forward) or left (back) and load it. */
 void settings_ui_push(lv_obj_t *page, bool forward);

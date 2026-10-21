@@ -50,6 +50,7 @@ static uint16_t *s_doom_rgb565;       /* 320x200 staging buffer, DMA-capable */
 static ppa_client_handle_t s_ppa;
 static volatile bool s_running;
 static volatile bool s_quit;
+static volatile bool s_input_running;   /* input_task alive; it clears this */
 static QueueHandle_t s_keys;
 static bool s_drew_first_frame;
 
@@ -451,6 +452,7 @@ static void input_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(16));
     }
 
+    s_input_running = false;
     vTaskDelete(NULL);
 }
 
@@ -467,75 +469,16 @@ int p4_doom_get_key(int *pressed, unsigned char *key)
 
 /* -------------------------------------------------------------------- run -- */
 
-esp_err_t app_doom_run(void)
+/*
+ * The setjmp() lives in its own function so no caller locals are live across
+ * it: after a longjmp() back, a non-volatile local's value is indeterminate.
+ * Anything the error path needs is file-scope (s_lvgl_locked).
+ */
+static bool s_lvgl_locked;
+
+static __attribute__((noinline)) esp_err_t run_until_quit(void)
 {
-    app_doom_stage("run entered");
-
-    /*
-     * Hand the radio's memory to Doom.
-     *
-     * The first attempt at this crashed in the SDIO driver, not in Doom:
-     *   assert failed: sdio_push_data_to_queue sdio_drv.c:701 (pkt_rxbuff)
-     * Loading the WAD drained internal RAM until the transport to the C6 could
-     * not allocate a receive buffer for an incoming frame, and the assert took
-     * the whole board down. Nothing here needs the network.
-     */
-    app_ble_scan_stop();
-    app_net_suspend();
-
-    if (s_running) {
-        app_doom_stage("already running");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (s_panel == NULL) {
-        ESP_LOGE(TAG, "no panel handle");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (!app_doom_available()) {
-        ESP_LOGE(TAG, "doom1.wad not found in the storage partition");
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    void *fb = NULL;
-    esp_err_t err = esp_lcd_dpi_panel_get_frame_buffer(s_panel, 1, &fb);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "cannot get frame buffer: %s", esp_err_to_name(err));
-        return err;
-    }
-    s_frame_buffer = fb;
-    app_doom_stage("framebuffer ok");
-
-    s_doom_rgb565 = heap_caps_malloc(DOOM_W * DOOM_H * 2,
-                                     MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM);
-    if (s_doom_rgb565 == NULL) {
-        ESP_LOGE(TAG, "cannot allocate the staging buffer");
-        return ESP_ERR_NO_MEM;
-    }
-
-    ppa_client_config_t ppa_cfg = {
-        .oper_type = PPA_OPERATION_SRM,
-    };
-    err = ppa_register_client(&ppa_cfg, &s_ppa);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ppa register failed: %s", esp_err_to_name(err));
-        heap_caps_free(s_doom_rgb565);
-        s_doom_rgb565 = NULL;
-        return err;
-    }
-
-    app_doom_stage("ppa ok");
-
-    s_keys = xQueueCreate(32, sizeof(key_event_t));
-    s_quit = false;
-    s_running = true;
-    s_exit_visible = false;
-    s_drew_first_frame = false;
-
-    app_doom_loading_begin();
-
-    xTaskCreate(input_task, "doom_in", 3072, NULL, 5, NULL);
-
-    ESP_LOGI(TAG, "starting doom, fb=%p staging=%p", s_frame_buffer, s_doom_rgb565);
+    s_lvgl_locked = false;
 
     esp_err_t result = ESP_OK;
     if (setjmp(s_fatal_jmp) == 0) {
@@ -562,7 +505,9 @@ esp_err_t app_doom_run(void)
          * the frame buffer and the adapter must not flush over it.
          */
         app_doom_loading_end();
-        if (!bsp_display_lock(2000)) {
+        if (bsp_display_lock(2000)) {
+            s_lvgl_locked = true;
+        } else {
             ESP_LOGW(TAG, "could not take the lvgl lock, running anyway");
         }
 
@@ -579,23 +524,134 @@ esp_err_t app_doom_run(void)
         result = ESP_FAIL;
     }
     s_fatal_ready = false;
+    return result;
+}
+
+esp_err_t app_doom_run(void)
+{
+    app_doom_stage("run entered");
+
+    if (s_running) {
+        app_doom_stage("already running");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_panel == NULL) {
+        ESP_LOGE(TAG, "no panel handle");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!app_doom_available()) {
+        ESP_LOGE(TAG, "doom1.wad not found in the storage partition");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /*
+     * Hand the radio's memory to Doom.
+     *
+     * The first attempt at this crashed in the SDIO driver, not in Doom:
+     *   assert failed: sdio_push_data_to_queue sdio_drv.c:701 (pkt_rxbuff)
+     * Loading the WAD drained internal RAM until the transport to the C6 could
+     * not allocate a receive buffer for an incoming frame, and the assert took
+     * the whole board down. Nothing here needs the network.
+     *
+     * From here on every way out must go through app_net_resume(), or the clock
+     * comes back with Wi-Fi stopped until the next reboot.
+     */
+    app_ble_scan_stop();
+    app_net_suspend();
+
+    void *fb = NULL;
+    esp_err_t err = esp_lcd_dpi_panel_get_frame_buffer(s_panel, 1, &fb);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "cannot get frame buffer: %s", esp_err_to_name(err));
+        goto fail_resume;
+    }
+    s_frame_buffer = fb;
+    app_doom_stage("framebuffer ok");
+
+    s_doom_rgb565 = heap_caps_malloc(DOOM_W * DOOM_H * 2,
+                                     MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM);
+    if (s_doom_rgb565 == NULL) {
+        ESP_LOGE(TAG, "cannot allocate the staging buffer");
+        err = ESP_ERR_NO_MEM;
+        goto fail_resume;
+    }
+
+    ppa_client_config_t ppa_cfg = {
+        .oper_type = PPA_OPERATION_SRM,
+    };
+    err = ppa_register_client(&ppa_cfg, &s_ppa);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ppa register failed: %s", esp_err_to_name(err));
+        goto fail_free;
+    }
+
+    app_doom_stage("ppa ok");
+
+    s_keys = xQueueCreate(32, sizeof(key_event_t));
+    if (s_keys == NULL) {
+        ESP_LOGE(TAG, "cannot allocate the key queue");
+        ppa_unregister_client(s_ppa);
+        s_ppa = NULL;
+        err = ESP_ERR_NO_MEM;
+        goto fail_free;
+    }
+    s_quit = false;
+    s_running = true;
+    s_exit_visible = false;
+    s_drew_first_frame = false;
+
+    app_doom_loading_begin();
+
+    s_input_running = true;
+    if (xTaskCreate(input_task, "doom_in", 3072, NULL, 5, NULL) != pdPASS) {
+        /* Doom still runs (and quits from the touch button never shows), so
+         * this is worth a log but not worth refusing to start. */
+        ESP_LOGW(TAG, "no memory for the input task: pad and touch disabled");
+        s_input_running = false;
+    }
+
+    ESP_LOGI(TAG, "starting doom, fb=%p staging=%p", s_frame_buffer, s_doom_rgb565);
+
+    esp_err_t result = run_until_quit();
 
     ESP_LOGI(TAG, "leaving doom");
-    bsp_display_unlock();
+    /* The fatal path can land here with the loading screen still referenced;
+     * drop those pointers before ui_close_app() deletes the objects, or the
+     * next launch's first stage writes into freed memory. */
+    app_doom_loading_end();
+    if (s_lvgl_locked) {
+        bsp_display_unlock();
+        s_lvgl_locked = false;
+    }
+    s_quit = true;
     s_running = false;
 
-    /* Give the input task a tick to notice s_quit and delete itself. */
-    vTaskDelay(pdMS_TO_TICKS(50));
+    /* The input task posts to s_keys and reads the touch controller, so it has
+     * to be gone before the queue is deleted and LVGL gets the touch back. */
+    for (int i = 0; i < 50 && s_input_running; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    if (s_input_running) {
+        ESP_LOGE(TAG, "input task did not stop; leaking the key queue");
+    } else {
+        vQueueDelete(s_keys);
+    }
+    s_keys = NULL;
 
     ppa_unregister_client(s_ppa);
     s_ppa = NULL;
     heap_caps_free(s_doom_rgb565);
     s_doom_rgb565 = NULL;
-    vQueueDelete(s_keys);
-    s_keys = NULL;
 
     app_net_resume();
 
     app_doom_stage(result == ESP_OK ? "exited cleanly" : "exited with error");
     return result;
+
+fail_free:
+    heap_caps_free(s_doom_rgb565);
+    s_doom_rgb565 = NULL;
+fail_resume:
+    app_net_resume();
+    return err;
 }
