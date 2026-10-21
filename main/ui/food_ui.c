@@ -10,6 +10,7 @@
 
 #include "bsp/esp-bsp.h"
 #include "net/app_api.h"
+#include "net/app_net.h"
 #include "ui/food_ui.h"
 #include "ui/ui.h"
 #include "ui/ui_fonts.h"
@@ -45,7 +46,19 @@ static uint32_t nutriscore_colour(char grade)
 static void show_result(void)
 {
     api_food_t f;
-    if (!app_food_result(&f) || strcmp(f.code, s_code) != 0) {
+    /* Every way out of here must replace "Looking up...", or the page sits on
+     * it forever: poll_cb has already stopped waiting. */
+    bool ok = app_food_result(&f);
+    if (strcmp(f.code, s_code) != 0) {
+        /* The code was edited while an earlier lookup was still running. */
+        lv_label_set_text(s_status, "Press GO to look this code up");
+        return;
+    }
+    if (!ok) {
+        app_net_state_t net = app_net_state();
+        lv_label_set_text(s_status, net == APP_NET_CONNECTED || net == APP_NET_SYNCED
+                                        ? "Lookup failed - try again"
+                                        : "Lookup failed - no network");
         return;
     }
 
@@ -132,9 +145,16 @@ static void keypad_cb(lv_event_t *e)
         }
     } else if (strcmp(key, "GO") == 0) {
         if (strlen(s_code) >= 8) {
-            s_awaiting = true;
-            lv_label_set_text(s_status, "Looking up...");
-            app_food_request(s_code);
+            if (app_food_request(s_code)) {
+                s_awaiting = true;
+                lv_label_set_text(s_status, "Looking up...");
+            } else if (app_food_busy()) {
+                lv_label_set_text(s_status, "Still looking up the last code");
+            } else {
+                lv_label_set_text(s_status, app_api_configured()
+                                                ? "Could not start the lookup"
+                                                : "Food lookup is not set up");
+            }
         } else {
             lv_label_set_text(s_status, "Barcodes are at least 8 digits");
         }

@@ -36,8 +36,9 @@ static const char *TAG = "api";
 #define SUN_PERIOD_S      (6 * 60 * 60)
 
 /* Bodies land in PSRAM: news in particular runs to tens of kilobytes and
- * internal RAM is the scarce pool on this board. */
-#define RESPONSE_MAX 24576
+ * internal RAM is the scarce pool on this board. The buffer only lives for one
+ * request, so the cap is generous; api_get() logs if a body still exceeds it. */
+#define RESPONSE_MAX 65536
 
 static const char *WATCHLIST[] = { "AAPL", "MSFT", "NVDA" };
 #define WATCHLIST_COUNT ((int)(sizeof(WATCHLIST) / sizeof(WATCHLIST[0])))
@@ -122,7 +123,14 @@ static char *api_get(const char *path)
     }
     body[total] = '\0';
 
-    if (total == 0) {
+    /* A body cut off at the cap would only fail in cJSON_Parse as an anonymous
+     * "fetch failed" and retry forever, so say why and give up on it. */
+    if (total == RESPONSE_MAX - 1 && !esp_http_client_is_complete_data_received(client)) {
+        ESP_LOGE(TAG, "%s: response larger than RESPONSE_MAX (%d bytes), dropped",
+                 path, RESPONSE_MAX);
+        heap_caps_free(body);
+        body = NULL;
+    } else if (total == 0) {
         heap_caps_free(body);
         body = NULL;
     }
@@ -523,10 +531,10 @@ static void food_task(void *arg)
     vTaskDelete(NULL);
 }
 
-void app_food_request(const char *code)
+bool app_food_request(const char *code)
 {
     if (s_food_busy || !app_api_configured()) {
-        return;
+        return false;
     }
     strlcpy(s_food_code, code, sizeof(s_food_code));
     s_food_busy = true;
@@ -534,7 +542,9 @@ void app_food_request(const char *code)
     /* Deep enough for a TLS handshake, and gone again as soon as it lands. */
     if (xTaskCreate(food_task, "food", 8192, NULL, 4, NULL) != pdPASS) {
         s_food_busy = false;
+        return false;
     }
+    return true;
 }
 
 bool app_food_busy(void)
@@ -562,41 +572,45 @@ static void api_task(void *arg)
     while (true) {
         /* Nothing to do until there is a network and a real clock: the fetch
          * schedule is keyed off wall time. */
-        if (app_net_state() < APP_NET_CONNECTED || time(NULL) < 1700000000) {
+        app_net_state_t net = app_net_state();
+        bool online = net == APP_NET_CONNECTED || net == APP_NET_SYNCED;
+        if (!online || time(NULL) < 1700000000) {
             s_status = "Waiting for network";
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
 
         uint32_t now = (uint32_t)time(NULL);
-        bool did_work = false;
+        bool fetched = false;
 
         if (now >= next_weather) {
             s_status = "Updating weather";
-            next_weather = now + (fetch_weather() ? WEATHER_PERIOD_S : 60);
-            did_work = true;
+            fetched = fetch_weather();
+            next_weather = now + (fetched ? WEATHER_PERIOD_S : 60);
         } else if (now >= next_sun) {
             s_status = "Updating sun";
-            next_sun = now + (fetch_sun() ? SUN_PERIOD_S : 300);
-            did_work = true;
+            fetched = fetch_sun();
+            next_sun = now + (fetched ? SUN_PERIOD_S : 300);
         } else if (now >= next_news) {
             s_status = "Updating news";
-            next_news = now + (fetch_news() ? NEWS_PERIOD_S : 60);
-            did_work = true;
+            fetched = fetch_news();
+            next_news = now + (fetched ? NEWS_PERIOD_S : 60);
         } else if (now >= next_hn) {
             s_status = "Updating Hacker News";
-            next_hn = now + (fetch_hn() ? HN_PERIOD_S : 60);
-            did_work = true;
+            fetched = fetch_hn();
+            next_hn = now + (fetched ? HN_PERIOD_S : 60);
         } else if (now >= next_markets) {
             s_status = "Updating markets";
-            next_markets = now + (fetch_markets() ? MARKETS_PERIOD_S : 60);
-            did_work = true;
+            fetched = fetch_markets();
+            next_markets = now + (fetched ? MARKETS_PERIOD_S : 60);
         }
 
-        if (did_work) {
+        /* Only new data counts: every bump makes the HUD redraw and restart
+         * its headline rotation, so a failing gateway must not bump it. */
+        if (fetched) {
             s_generation++;
-            s_status = "Idle";
         }
+        s_status = "Idle";
 
         /* One request at a time, spaced out: the UI is never waiting on this. */
         vTaskDelay(pdMS_TO_TICKS(2000));

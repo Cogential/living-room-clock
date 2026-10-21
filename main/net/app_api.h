@@ -113,7 +113,9 @@ typedef struct {
     float energy_kcal, fat, saturated_fat, carbohydrates, sugars, proteins, salt;
 } api_food_t;
 
-void app_food_request(const char *code);
+/* False if the lookup was not started (no token, one already running, or no
+ * memory for the task); the previous result is then left as it was. */
+bool app_food_request(const char *code);
 bool app_food_busy(void);
 bool app_food_result(api_food_t *out);
 
