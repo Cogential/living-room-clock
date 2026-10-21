@@ -448,8 +448,18 @@ static void settings_btn_cb(lv_event_t *e)
     ui_open_settings();
 }
 
+/* Largest finger travel, in pixels, that still counts as a tap on the face. */
+#define FACE_TAP_SLOP 24
+
 static void chrome_input_cb(lv_event_t *e)
 {
+    /* LVGL still sends SHORT_CLICKED when a swipe is released (the top layer is
+     * not scrollable, so nothing cancels it), with the release point as the
+     * position. Remember where the press started and whether it became a
+     * gesture, so a swipe to wake the chrome never opens a QR sheet. */
+    static lv_point_t press_at;
+    static bool press_swiped;
+
     lv_event_code_t code = lv_event_get_code(e);
 
     if (code == LV_EVENT_PRESSED) {
@@ -457,6 +467,8 @@ static void chrome_input_cb(lv_event_t *e)
         /* Only fires for taps that miss every clickable child. */
         touch_debug_note("(background)");
 #endif
+        lv_indev_get_point(lv_indev_active(), &press_at);
+        press_swiped = false;
         chrome_wake();
         return;
     }
@@ -464,6 +476,7 @@ static void chrome_input_cb(lv_event_t *e)
     if (code == LV_EVENT_GESTURE) {
         /* Faces are chosen in Settings only, so a swipe just wakes the chrome
          * rather than cycling the list under the user. */
+        press_swiped = true;
         chrome_wake();
         return;
     }
@@ -473,6 +486,10 @@ static void chrome_input_cb(lv_event_t *e)
     if (code == LV_EVENT_SHORT_CLICKED && s_face && s_face->tap && !ui_app_open()) {
         lv_point_t p;
         lv_indev_get_point(lv_indev_active(), &p);
+        if (press_swiped || LV_ABS(p.x - press_at.x) > FACE_TAP_SLOP ||
+            LV_ABS(p.y - press_at.y) > FACE_TAP_SLOP) {
+            return;
+        }
         s_face->tap(p.x, p.y);
     }
 }
