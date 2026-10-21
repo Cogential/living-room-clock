@@ -577,9 +577,11 @@ void ui_hud_tick(const clock_time_t *now)
         if (!app_api_hn(&s_hn)) {
             s_hn.count = 0;
         }
-        /* A card being browsed keeps its place; the rest pick up the refresh. */
+        /* A card being browsed keeps its place; the rest pick up the refresh.
+         * An empty card has no place to keep, so it never holds out. */
         for (int c = 0; c < CARD_COUNT; c++) {
-            if (!s_hist[c].holding) {
+            if (!s_hist[c].holding || s_hist[c].count == 0) {
+                s_hist[c].holding = false;
                 hist_push_current(c);
                 card_show(c);
             }
@@ -645,7 +647,9 @@ void ui_hud_tap(int x, int y)
         } else {
             card_advance(c);
         }
-        h->holding = true;
+        /* Nothing to browse yet: holding would only keep the card on
+         * "Waiting" after the first headlines land. */
+        h->holding = h->count > 0;
         h->browsed = lv_tick_get();
         card_show(c);
         return;
