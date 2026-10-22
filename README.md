@@ -3,22 +3,37 @@
 A wall clock for the **Waveshare ESP32-P4-WIFI6-Touch-LCD-7B** (1024x600 MIPI-DSI,
 GT911 touch), built on ESP-IDF v5.5.5 + LVGL 9.5.
 
-Four swipeable clock faces, a phone-style dock, and NTP time sync over the
-board's onboard ESP32-C6 radio.
+Thirteen clock faces (picked in Settings), weather, headlines, Hacker News and
+market panels from a data gateway you run yourself, NTP time sync over the
+board's onboard ESP32-C6 radio, and DOOM.
 
 ## Building
 
+1. Install [ESP-IDF v5.5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5.5/esp32p4/get-started/)
+   with the `esp32p4` target.
+2. `cp main/secrets.h.example main/secrets.h` and fill it in: your data gateway's
+   URL and token, and your location for the weather (see **Data gateway**). It is
+   gitignored. Skip it and the clock still builds and keeps time, just without
+   the feeds.
+3. Optional: put `doom1.wad` in `spiffs/` for DOOM (see **DOOM**).
+4. Build and flash:
+
 ```bash
 . ~/esp/esp-idf/export.sh
-./tools/devflash.sh          # build + flash, picks the right port, retries
+./tools/devflash.sh          # build + app-flash once (prefers the CH34x port)
+FLASH_ALL=1 ./tools/devflash.sh   # first time, or after changing spiffs/: also writes the storage partition
+./tools/chunkflash.sh        # app only, after a build: fallback when a flash dies "chip stopped responding"
 ./tools/devlog.sh 25         # reset, then capture 25s of boot log
 ./tools/devmon.sh 60         # watch the console WITHOUT resetting
 ```
 
-Flashing over the native USB-JTAG port intermittently dies partway with "chip
-stopped responding", more often the larger the image and the higher the baud;
-`devflash.sh` steps the baud down and retries. See **Serial ports** below for the
-modem-line traps on each port.
+Long writes to this board can die partway with "chip stopped responding", more
+often the bigger the image. `devflash.sh` makes **one** attempt on purpose: a
+failed write leaves the chip wedged and every retry fails earlier than the last,
+so power cycle the board before trying again. If it keeps failing,
+`chunkflash.sh` writes the image in 512 KB pieces, retries any piece that fails
+on its own, and verifies the whole thing by reading it back. It writes the app
+only, from an existing build. See **Serial ports** below for which port to use.
 
 ## Setting it up
 
@@ -55,7 +70,7 @@ The radio is started even with no credentials so the settings screen can scan.
 
 | Group | What it does |
 |---|---|
-| Clock face | Picks from the eleven faces |
+| Clock face | Picks from the thirteen faces |
 | Brightness | Backlight level, applied live as you drag |
 | Night dimming | Drops to a lower brightness between two hours, wrapping past midnight |
 | 24-hour time | Switches every face between 24h and 12h + AM/PM |
@@ -95,23 +110,40 @@ HUD** - clock top left, then a panel per feed - and only the styling changes, so
 information is always in the same place. The clock area carries no face
 switcher: nothing to fat-finger on a wall clock.
 
-**Pip-Boy** is the default on a fresh install.
+**Phosphor** is the default on a fresh install.
 
 | Face | Look |
 |---|---|
 | **Dashboard** | Navy gradient, rounded glass panels, thin numerals. The plainest. |
-| **Photo** | The embedded picture behind dark glass panels; the clock sits on the photo with a per-glyph shadow. |
+| **Photo** | A forest at dawn behind dark glass panels; the clock sits on the picture with a per-glyph shadow. Use your own picture: see below. |
 | **Minimal** | Warm paper, white panels, muted section colours. The one that reads in daylight. |
 | **Cyberpunk** | Hazard yellow on black, magenta ghost behind the numerals, `//` headings, scanlines in the gaps. |
-| **Outrun** | Violet panels, a half-transparent banded sun sinking behind the clock onto a neon horizon. |
-| **Pip-Boy** | Green phosphor, monochrome - sections told apart by `>` headings, not colour; amber only for a falling price. Blinking block cursor. |
+| **Synthwave** | Violet panels, a half-transparent banded sun sinking behind the clock onto a neon horizon. |
+| **Phosphor** | Green phosphor, monochrome - sections told apart by `>` headings, not colour; amber only for a falling price. Blinking block cursor. |
 | **Rapture** | Art deco under the sea: brass-edged square panels on oxidised teal, a stepped ziggurat above the clock. |
-| **Stardew** | Wooden boards on a green field; the clock is carved into a sign. Dates read "Fall 28", not 28/09. |
+| **Harvest** | Wooden boards on a green field; the clock is carved into a sign. Dates read "Fall 28", not 28/09. |
 | **Tavern** | Ink on parchment. Roman numeral hour leads the date, an ornate rule beneath, a wax seal counting seconds. |
-| **Blockcraft** | Sky, blocky clouds, a strip of turf; stone panels with a hard offset shadow instead of a blur. |
-| **Aperture** | White signage plates on a seamed wall; two portal-coloured bars close on the middle as the minute runs out. |
-| **Hyrule** | Gold on forest green, a small triangle motif over the clock. |
+| **Voxel** | Sky, blocky clouds, a strip of turf; stone panels with a hard offset shadow instead of a blur. |
+| **Lab** | White signage plates on a seamed wall; two accent-coloured bars close on the middle as the minute runs out. |
+| **Grove** | Gold on forest green, a small triangle motif over the clock. |
 | **Cuckoo** | Carved case beside a left-aligned clock. Pendulum swings continuously; the bird comes out on the hour and at :30, and once when the face is opened. Change the `tm_min == 0 \|\| tm_min == 30` test in `face_cuckoo.c` to make it hourly only. |
+
+### Your own picture on the Photo face
+
+The picture is `main/assets/photo.rgb565`: 1024x600, raw RGB565, little-endian,
+embedded in the app. The forest is drawn by `tools/gen_forest.py`. To use a
+photo instead, convert it (Pillow) and rebuild:
+
+```python
+from PIL import Image
+import struct
+img = Image.open("mine.jpg").convert("RGB").resize((1024, 600))
+with open("main/assets/photo.rgb565", "wb") as f:
+    for r, g, b in img.getdata():
+        f.write(struct.pack("<H", ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)))
+```
+
+Keep personal photos out of a public fork: the file is committed.
 
 ## The HUD
 
@@ -143,20 +175,63 @@ have one. The chrome layer sits above every face and takes all touches, so it
 forwards short taps on empty background to the face's optional `tap(x, y)`;
 faces set `.tap = ui_hud_tap`. The sheet closes on any tap or after a minute.
 
-## Food
+## Data gateway
 
-The cutlery button beside the gear opens a barcode lookup: name, brand,
-Nutri-Score on its own colour ramp, NOVA group with what it means, and the
-per-100g table. Codes are typed on a numeric keypad - there is no camera on the
-MIPI-CSI connector, and barcodes are digits, so a full keyboard would only cost
-space.
+The clock does not talk to weather, news or market services directly. It asks
+one HTTPS server - your **data gateway** - for small, pre-digested JSON, so the
+firmware never parses a 200 KB RSS feed or holds API keys for five services in
+flash. You run the gateway; the clock only needs its address.
 
-The icon is **drawn from rectangles**: LVGL's symbol font has no cutlery glyph
-and the Ubuntu faces have nothing at those codepoints either - the same trap
-that left the settings gear invisible until it moved to a built-in font.
+**Configure it** in `main/secrets.h` (copy `secrets.h.example`):
 
-Lookups run on a short-lived task so the UI can show progress instead of
-freezing for the round trip.
+| Define | Meaning |
+|---|---|
+| `CLOCK_API_BASE` | Base URL, no trailing slash, e.g. `https://clock.example.net`. Leave it out and the panels say "No data gateway". |
+| `CLOCK_API_TOKEN` | Sent as `Authorization: Bearer <token>`. Empty for an open gateway (keep it on your LAN or tailnet then). |
+| `CLOCK_LATITUDE`, `CLOCK_LONGITUDE`, `CLOCK_PLACE` | Where the weather is for. First-boot defaults only; no place means no weather. |
+
+The gateway must serve **HTTPS with a publicly trusted certificate** (the client
+uses ESP-IDF's CA bundle; Let's Encrypt is fine, self-signed is not). Each body
+must be under 64 KB, and links over 200 characters are dropped rather than
+shortened into broken QR codes. The stock symbols are in `WATCHLIST` in
+`main/net/app_api.c`.
+
+### What it has to serve
+
+Every endpoint is a `GET` returning JSON. Missing fields fall back to blanks; a
+non-200 status is retried a minute later.
+
+| Endpoint | Response |
+|---|---|
+| `/weather?lat=..&lon=..` | `{"temp":21,"feels":20,"humidity":64,"wind":12,"aqi":31,"hi":24,"lo":13,"desc":"Partly cloudy","forecast":[{"d":"Thu","hi":22,"lo":11}, ...3 days]}` - whole numbers in the units you want shown (the clock adds only `°` and `%`); `aqi` -1 if unknown. |
+| `/space/sun?lat=..&lon=..` | `{"sunrise":"2026-10-22T11:32:00+00:00","sunset":"2026-10-22T22:18:00+00:00"}` - UTC ISO 8601; the clock converts to its time zone. |
+| `/news` | `{"items":[{"title":"...","source":"BBC News","link":"https://..."}, ...]}` - up to 20. |
+| `/hn/top` | `{"items":[{"title":"...","score":312,"comments":148,"url":"https://...","hn_url":"https://news.ycombinator.com/item?id=..."}, ...]}` - up to 20; `comments` null for job posts. |
+| `/finance/quote?symbol=AAPL` | `{"symbol":"AAPL","price":231.4,"changePct":-0.82}` |
+| `/finance/crypto?ids=bitcoin` | `{"prices":{"bitcoin":{"usd":67250.1,"usd_24h_change":1.9}}}` (CoinGecko's `simple/price` shape) |
+| `/finance/fear-greed` | `{"score":62,"rating":"greed"}` |
+
+Any endpoint can be left out: that panel just stays on "Waiting" / `--`.
+
+### Where the data can come from
+
+A gateway is a small program - a Python/Node server on a Raspberry Pi or NAS,
+or a Cloudflare Worker - that calls these and reshapes the replies. Check each
+provider's current terms and limits; free tiers change.
+
+| Panel | No key needed | Free key |
+|---|---|---|
+| Weather, AQI | [Open-Meteo](https://open-meteo.com/) forecast + air-quality APIs (non-commercial use) | OpenWeatherMap |
+| Sunrise/sunset | Open-Meteo `daily=sunrise,sunset`, or [sunrise-sunset.org](https://sunrise-sunset.org/api) | - |
+| News | RSS feeds (BBC, CBC, NPR, ...), or [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) (noisier, ~1 request per 5 s) | [Guardian Open Platform](https://open-platform.theguardian.com/) (non-commercial), [NewsData.io](https://newsdata.io/), GNews, NewsAPI.org (development only) |
+| Hacker News | [Official HN API](https://github.com/HackerNews/API) or [Algolia HN Search](https://hn.algolia.com/api) (`/api/v1/search?tags=front_page`, one request) | - |
+| Stocks | - | Finnhub, Alpha Vantage (tight daily limits) |
+| Bitcoin | [CoinGecko](https://www.coingecko.com/en/api) `simple/price` | - |
+| Fear & Greed | [alternative.me](https://alternative.me/crypto/fear-and-greed-index/) (crypto index, no key) | - |
+
+Cache on the gateway side: the clock polls weather and markets every 10
+minutes, news and HN every 15, sun every 6 hours, and a cache keeps you well
+inside every free tier.
 
 ## Layout
 
@@ -166,8 +241,13 @@ main/
   app_settings.c         NVS-backed settings + timezone table
   Kconfig.projbuild      first-boot defaults only
   net/app_net.c          Wi-Fi + scanning + SNTP, entirely non-blocking
+  net/app_api.c          data gateway client: weather, news, HN, markets
+  secrets.h.example      gateway URL/token and location; copy to secrets.h
+  doom/app_doom.c        DOOM launcher, input and PPA blit
   ble/app_ble.c          NimBLE central: scan, connect, remember one peer
   ui/ui.c                screens, dock, status bar, gestures, tick loop
+  ui/ui_hud.c            the layout every face shares
+  ui/qr_sheet.c          headline -> QR code sheet
   ui/ui_theme.c          shared layer/gradient/glow helpers
   ui/ui_widgets.c        settings row/slider/switch building blocks
   ui/settings_ui.c       root settings page + timezone picker
@@ -176,20 +256,32 @@ main/
   ui/ui_fonts.c          Tiny TTF font cache over the embedded Ubuntu faces
   ui/faces/*.c           one file per clock face
   assets/*.ttf           embedded Ubuntu Thin / Medium / Mono Bold
+  assets/photo.rgb565    the Photo face's picture
+components/doomgeneric/  the Doom engine (GPLv2) and its ESP32-P4 platform layer
+spiffs/                  storage partition contents (doom1.wad); not committed
 tools/
-  devflash.sh            build + flash, resolving the port and retrying
+  devflash.sh            build + one app-flash attempt, resolving the port
+  chunkflash.sh          flash in 512 KB pieces with read-back verify
   devlog.sh              reset, then capture the boot log
   devmon.sh              watch the console without resetting
+  gen_forest.py          regenerates the Photo face's forest scene
 ```
 
 ## Serial ports
 
-**One cable is enough.** The console is routed to the native USB-JTAG port
-(`CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`), so flashing and logs share it. The
-CH34x bridge carrying UART0 is not needed and is best left unplugged.
+The board has two USB ports and they do different jobs:
 
-Their `/dev/ttyACMx` numbers **swap between plugs**, so always resolve through
-`/dev/serial/by-id/` (`usb-Espressif_USB_JTAG_*`). The helper scripts do.
+- **CH34x (UART0) for flashing.** Large writes over the native USB-JTAG port die
+  partway far more often; the CH34x wrote the 5 MB storage image first time.
+  `devflash.sh` and `chunkflash.sh` prefer it when it is plugged in.
+- **USB-JTAG for the console.** `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`, so
+  `devlog.sh`/`devmon.sh` read logs there. The CH34x shows only the ROM
+  bootloader's first lines.
+
+Use one cable at a time where you can. Their `/dev/ttyACMx` numbers **swap
+between plugs**, so always resolve through `/dev/serial/by-id/`
+(`usb-1a86_*` for the CH34x, `usb-Espressif_USB_JTAG_*` for the chip). The helper
+scripts do.
 
 Modem control lines matter, and differently per port:
 
@@ -347,10 +439,23 @@ own supply.
 
 Settings -> DOOM launches it full screen; **PS + Create** quits back to the
 clock. The engine is [doomgeneric](https://github.com/ozkl/doomgeneric) via the
-[ESP32-P4 port](https://github.com/alexkid77/ESP32P4DOOM), with the freely
-redistributable shareware `doom1.wad` in the `storage` partition. **Doom's
-source is GPLv2** - fine for your own board, but it constrains redistributing
-the firmware.
+[ESP32-P4 port](https://github.com/alexkid77/ESP32P4DOOM). **Doom's source is
+GPLv2**, which is why this whole project is (see **License**).
+
+**The game data is not included.** To add it:
+
+1. Get the shareware `doom1.wad` (Doom episode 1, about 4 MB). id Software
+   released it for free distribution, and it is easy to find, e.g. in the
+   [Doom Wiki's shareware article](https://doomwiki.org/wiki/DOOM1.WAD) or in
+   the Debian/Ubuntu `doom-wad-shareware` package
+   (`/usr/share/games/doom/doom1.wad`). If you own the full game, `doom.wad`
+   from it is not supported here: the storage partition is sized for the
+   shareware file.
+2. Copy it to `spiffs/doom1.wad` (lower case).
+3. Flash the storage partition once: `FLASH_ALL=1 ./tools/devflash.sh`. Later
+   app-only flashes leave it alone.
+
+Without it the DOOM button just logs "doom1.wad missing" and the clock carries on.
 
 Doom renders 320x200 in RGB565; the **PPA** scales it to 1024x600 straight into
 the MIPI-DSI frame buffer. Start-up takes about ten seconds, so the stage
@@ -448,9 +553,9 @@ carries both Wi-Fi and BLE asserted:
 assert failed: sdio_rx_get_buffer sdio_drv.c:670 (*buf)
 ```
 
-Lowering that threshold moves the traffic to PSRAM. It is now **64 bytes**: 256
-was enough until USB host was added, at which point BLE could no longer allocate
-an HCI command buffer and scanning failed outright:
+Lowering that threshold moves the traffic to PSRAM. 256 was enough until USB
+host was added, at which point BLE could no longer allocate an HCI command
+buffer and scanning failed outright:
 
 ```
 E vhci_drv: Tx ble_transport_to_ll_cmd_impl: malloc failed
@@ -458,7 +563,8 @@ E ble: scan start failed (17)
 ```
 
 At 64 bytes the plateau went from 35-70 KB back up to 73-101 KB and the failure
-went away. The measured frame rate did not change at either setting. Anything
+went away. It is now **0** (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0`), which Doom's
+texture setup needed - see **DOOM**. The measured frame rate did not change at either setting. Anything
 that genuinely needs internal or DMA memory asks for it by capability and is
 unaffected.
 
@@ -505,3 +611,13 @@ between harnesses or back to a normal build.
   firmware (as shipped from Waveshare).
 - `W (…) ledc: GPIO 32 is not usable` at boot comes from the BSP's backlight
   setup and is harmless - the backlight is driven anyway.
+
+## License
+
+GPL-2.0 (see `LICENSE`). The firmware links the Doom engine
+(`components/doomgeneric`, GPLv2), so the combined work is GPLv2.
+
+- The Ubuntu fonts in `main/assets/` are under the Ubuntu Font Licence 1.0
+  (`main/assets/UBUNTU-FONT-LICENCE.txt`).
+- `doom1.wad` is not included; see **DOOM**.
+- DOOM is a trademark of id Software; this project is not affiliated with it.
