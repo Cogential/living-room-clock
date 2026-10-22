@@ -48,8 +48,7 @@ idf.py -p /dev/serial/by-id/usb-1a86_* coredump-info   # backtrace of the last p
   `qr_sheet.c`, market cells). A face file in `ui/faces/` is mostly a `ui_hud_theme_t` plus background/overlay art, and
   exports a `clock_face_t` with `.tick = ui_hud_tick`, `.tap = ui_hud_tap`.
   Adding a face: new file, declare in `ui/ui.h`, add to `s_faces[]`, add to `main/CMakeLists.txt` `SRCS`.
-  Faces are stored/defaulted by **name** (`DEFAULT_FACE_NAME` = "Phosphor"), never by index. `face_analog.c` is in the
-  tree but not built or registered.
+  Faces are stored/defaulted by **name** (`DEFAULT_FACE_NAME` = "Phosphor"), never by index.
 - `ui/ui_fonts.c`: Tiny TTF over embedded Ubuntu TTFs, cached per (family, size); every instance has a Montserrat fallback
   so `LV_SYMBOL_*` glyphs render. Symbol-only labels use `ui_symbol_font()`.
 - `doom/app_doom.c` + `components/doomgeneric` (GPLv2; `doomgeneric_esp32p4.c` is the platform layer, `linker.lf` puts

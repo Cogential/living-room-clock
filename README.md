@@ -336,7 +336,7 @@ Animated faces should drive from the `clock_time_t` passed to `tick()`, or from
 the latter: the whole door-and-bird sequence is a pure function of elapsed time,
 so it cannot wedge half-open if a frame is dropped, and switching face mid-call
 leaves nothing behind. Anything that moves every frame must also keep a tight
-bounding box - see the pendulum, and the note about the analog hands below.
+bounding box - see the pendulum, and the note about clock hands below.
 
 Faces keep their widgets in module statics because only one is ever alive at a
 time. `tick()` is called ~30x/second; do the cheap thing and only touch widgets
@@ -384,9 +384,9 @@ Measured with the soak harness below:
   took the whole UI from ~28 fps to **under 1 fps** - LVGL's software shadow is
   recomputed every refresh and scales with blur radius over area. `ui_add_glow()`
   stacks translucent discs instead. Shadows under ~20 px are fine.
-- **Size objects to what they actually cover.** The analog hands were originally
-  full-screen `lv_line` objects, so every second invalidated all 1024x600 and
-  halved the frame rate. They now track a tight bounding box.
+- **Size objects to what they actually cover.** An early analog face drew its hands
+  as full-screen `lv_line` objects, so every second invalidated all 1024x600 and
+  halved the frame rate. Moving objects need a tight bounding box.
 - **Don't crossfade full screens.** Animating `opa` on a full-screen object forces
   an alpha layer every frame: it cost a fifth of the frame budget and stalled
   ~600 ms mid-animation. Faces are separate screens moved with
