@@ -9,6 +9,8 @@ add_compile_options(-Wno-unused-function)
 
 project(living_room_clock)
 
-# doom1.wad is shareware and freely redistributable. It is built into the
-# "storage" partition image and flashed alongside the app.
+# Everything in spiffs/ is built into the "storage" partition image and flashed
+# with `idf.py flash`. The repo ships it empty: drop doom1.wad in to get DOOM
+# (see README). Created here so a fresh clone builds without it.
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/spiffs)
 spiffs_create_partition_image(storage spiffs FLASH_IN_PROJECT)

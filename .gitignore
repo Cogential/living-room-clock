@@ -6,3 +6,8 @@ dependencies.lock
 
 # Local API token, never committed.
 main/secrets.h
+
+# Game data is never committed: users supply their own (see README, DOOM).
+spiffs/
+*.wad
+*.WAD
