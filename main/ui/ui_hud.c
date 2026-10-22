@@ -337,7 +337,7 @@ static void refresh_weather(void)
     api_weather_t w;
     if (!app_api_weather(&w)) {
         lv_label_set_text(s_wx_temp, "--°");
-        lv_label_set_text(s_wx_desc, app_api_configured() ? "Waiting..." : "No API token");
+        lv_label_set_text(s_wx_desc, app_api_configured() ? "Waiting..." : "No data gateway");
         return;
     }
 

@@ -19,13 +19,14 @@
 #if __has_include("secrets.h")
 #include "secrets.h"
 #endif
+#ifndef CLOCK_API_BASE
+#define CLOCK_API_BASE ""
+#endif
 #ifndef CLOCK_API_TOKEN
 #define CLOCK_API_TOKEN ""
 #endif
 
 static const char *TAG = "api";
-
-#define API_BASE "https://api.example.com"
 
 /* No rate-limit headers are published, so these are deliberately unhurried.
  * None of this data is worth hammering a shared gateway for. */
@@ -55,7 +56,7 @@ static const char *s_status = "Idle";
 
 bool app_api_configured(void)
 {
-    return CLOCK_API_TOKEN[0] != '\0';
+    return CLOCK_API_BASE[0] != '\0';
 }
 
 uint32_t app_api_generation(void)
@@ -74,7 +75,7 @@ const char *app_api_status(void)
 static char *api_get(const char *path)
 {
     char url[256];
-    snprintf(url, sizeof(url), "%s%s", API_BASE, path);
+    snprintf(url, sizeof(url), "%s%s", CLOCK_API_BASE, path);
 
     esp_http_client_config_t cfg = {
         .url = url,
@@ -90,9 +91,11 @@ static char *api_get(const char *path)
         return NULL;
     }
 
-    char auth[128];
-    snprintf(auth, sizeof(auth), "Bearer %s", CLOCK_API_TOKEN);
-    esp_http_client_set_header(client, "Authorization", auth);
+    if (CLOCK_API_TOKEN[0] != '\0') {
+        char auth[128];
+        snprintf(auth, sizeof(auth), "Bearer %s", CLOCK_API_TOKEN);
+        esp_http_client_set_header(client, "Authorization", auth);
+    }
 
     char *body = NULL;
     esp_err_t err = esp_http_client_open(client, 0);
@@ -234,6 +237,9 @@ static void iso_utc_to_local_hhmm(const char *iso, char *out, size_t out_len)
 static bool fetch_weather(void)
 {
     const settings_t *cfg = settings();
+    if (cfg->place[0] == '\0') {
+        return false;  /* no location set (CLOCK_PLACE in secrets.h) */
+    }
     char path[128];
     snprintf(path, sizeof(path), "/weather?lat=%.4f&lon=%.4f", cfg->latitude, cfg->longitude);
 
@@ -287,6 +293,9 @@ static bool fetch_weather(void)
 static bool fetch_sun(void)
 {
     const settings_t *cfg = settings();
+    if (cfg->place[0] == '\0') {
+        return false;  /* no location set (CLOCK_PLACE in secrets.h) */
+    }
     char path[128];
     snprintf(path, sizeof(path), "/space/sun?lat=%.4f&lon=%.4f", cfg->latitude, cfg->longitude);
 
@@ -477,89 +486,6 @@ static bool fetch_markets(void)
     return true;
 }
 
-/* ------------------------------------------------------------------ food -- */
-
-static api_food_t s_food;
-static volatile bool s_food_busy;
-static char s_food_code[16];
-
-static void food_task(void *arg)
-{
-    (void)arg;
-
-    char path[64];
-    snprintf(path, sizeof(path), "/food/%s", s_food_code);
-
-    api_food_t f = { 0 };
-    strlcpy(f.code, s_food_code, sizeof(f.code));
-
-    char *body = api_get(path);
-    if (body != NULL) {
-        cJSON *root = cJSON_Parse(body);
-        heap_caps_free(body);
-        if (root != NULL) {
-            const cJSON *found = cJSON_GetObjectItemCaseSensitive(root, "found");
-            f.ok = true;
-            f.found = cJSON_IsTrue(found);
-
-            if (f.found) {
-                copy_str(f.name, sizeof(f.name), root, "name");
-                copy_str(f.brands, sizeof(f.brands), root, "brands");
-                copy_str(f.nutriscore, sizeof(f.nutriscore), root, "nutriscore");
-                f.nova = get_int(root, "nova", 0);
-
-                const cJSON *n = cJSON_GetObjectItemCaseSensitive(root, "nutriments_100g");
-                if (n) {
-                    f.energy_kcal = get_float(n, "energy_kcal", -1.0f);
-                    f.fat = get_float(n, "fat", -1.0f);
-                    f.saturated_fat = get_float(n, "saturated_fat", -1.0f);
-                    f.carbohydrates = get_float(n, "carbohydrates", -1.0f);
-                    f.sugars = get_float(n, "sugars", -1.0f);
-                    f.proteins = get_float(n, "proteins", -1.0f);
-                    f.salt = get_float(n, "salt", -1.0f);
-                }
-            }
-            cJSON_Delete(root);
-        }
-    }
-
-    xSemaphoreTake(s_lock, portMAX_DELAY);
-    s_food = f;
-    xSemaphoreGive(s_lock);
-    s_food_busy = false;
-
-    vTaskDelete(NULL);
-}
-
-bool app_food_request(const char *code)
-{
-    if (s_food_busy || !app_api_configured()) {
-        return false;
-    }
-    strlcpy(s_food_code, code, sizeof(s_food_code));
-    s_food_busy = true;
-
-    /* Deep enough for a TLS handshake, and gone again as soon as it lands. */
-    if (xTaskCreate(food_task, "food", 8192, NULL, 4, NULL) != pdPASS) {
-        s_food_busy = false;
-        return false;
-    }
-    return true;
-}
-
-bool app_food_busy(void)
-{
-    return s_food_busy;
-}
-
-bool app_food_result(api_food_t *out)
-{
-    xSemaphoreTake(s_lock, portMAX_DELAY);
-    *out = s_food;
-    xSemaphoreGive(s_lock);
-    return out->ok;
-}
-
 /* ------------------------------------------------------------------ task -- */
 
 static void api_task(void *arg)
@@ -625,8 +551,8 @@ void app_api_start(void)
     }
 
     if (!app_api_configured()) {
-        ESP_LOGW(TAG, "no api token compiled in, see main/secrets.h.example");
-        s_status = "No token";
+        ESP_LOGW(TAG, "no gateway configured, see main/secrets.h.example");
+        s_status = "No gateway";
         return;
     }
 

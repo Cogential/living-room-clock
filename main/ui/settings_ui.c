@@ -208,7 +208,7 @@ static void refresh_cb(lv_timer_t *timer)
     }
     if (s_api_row_value) {
         lv_label_set_text(s_api_row_value,
-                          app_api_configured() ? app_api_status() : "No API token");
+                          app_api_configured() ? app_api_status() : "No data gateway");
     }
     if (s_pad_row_value) {
         pad_state_t pad = app_pad_state();
@@ -304,7 +304,7 @@ void settings_ui_open(void)
     w_nav_row(body, "Controller", "", open_pad_cb, NULL, &s_pad_row_value);
 
     w_section(body, "DATA");
-    w_info_row(body, "Feeds", app_api_configured() ? app_api_status() : "No API token",
+    w_info_row(body, "Feeds", app_api_configured() ? app_api_status() : "No data gateway",
                &s_api_row_value);
     w_info_row(body, "Location", cfg->place, NULL);
 

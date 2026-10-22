@@ -11,7 +11,6 @@ idf_component_register(
         "ui/ui_theme.c"
         "ui/ui_hud.c"
         "ui/ui_widgets.c"
-        "ui/food_ui.c"
         "ui/qr_sheet.c"
         "ui/settings_ui.c"
         "ui/settings_wifi_ui.c"

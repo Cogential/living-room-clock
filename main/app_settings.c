@@ -10,6 +10,16 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+/* No location: weather and sun are simply not fetched until one is set. */
+#ifndef CLOCK_LATITUDE
+#define CLOCK_LATITUDE  0.0f
+#define CLOCK_LONGITUDE 0.0f
+#define CLOCK_PLACE     ""
+#endif
+
 static const char *TAG = "settings";
 
 #define NVS_NAMESPACE "clock"
@@ -112,10 +122,10 @@ static void load_defaults(void)
     s_settings.hour_24 = CONFIG_CLOCK_24_HOUR ? true : false;
     s_settings.face_name[0] = '\0';  /* unset: ui.c picks the default face */
     s_settings.tz_index = -1;
-    /* Example City - resolved via the gateway's /geocode. */
-    s_settings.latitude = 0.0f;
-    s_settings.longitude = 0.0f;
-    strlcpy(s_settings.place, "", sizeof(s_settings.place));
+    /* From secrets.h, so a public build carries nobody's home town. */
+    s_settings.latitude = CLOCK_LATITUDE;
+    s_settings.longitude = CLOCK_LONGITUDE;
+    strlcpy(s_settings.place, CLOCK_PLACE, sizeof(s_settings.place));
 
     strlcpy(s_settings.timezone, CONFIG_CLOCK_TIMEZONE, sizeof(s_settings.timezone));
     strlcpy(s_settings.wifi_ssid, CONFIG_CLOCK_WIFI_SSID, sizeof(s_settings.wifi_ssid));

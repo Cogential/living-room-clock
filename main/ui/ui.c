@@ -10,7 +10,6 @@
 #include "esp_log.h"
 #include "net/app_net.h"
 #include "sdkconfig.h"
-#include "ui/food_ui.h"
 #include "ui/settings_ui.h"
 #include "ui/ui_fonts.h"
 #include "ui/ui_theme.h"
@@ -47,7 +46,6 @@ static int s_face_index = -1;
 static lv_obj_t *s_status_bar;
 static lv_obj_t *s_status_net_label;
 static lv_obj_t *s_status_gear_label;
-static lv_obj_t *s_status_food_icon;
 static lv_obj_t *s_status_doom_icon;
 static lv_obj_t *s_nav;
 static lv_obj_t *s_nav_prev_label;
@@ -164,14 +162,6 @@ static void apply_chrome_palette(bool light)
     lv_obj_set_style_text_color(s_nav_next_label, text, 0);
     lv_obj_set_style_bg_color(s_nav, surface, 0);
     lv_obj_set_style_bg_opa(s_nav, light ? LV_OPA_30 : LV_OPA_20, 0);
-
-    /* The cutlery is drawn, not typed, so it is recoloured piece by piece. */
-    if (s_status_food_icon) {
-        uint32_t n = lv_obj_get_child_count(s_status_food_icon);
-        for (uint32_t i = 0; i < n; i++) {
-            lv_obj_set_style_bg_color(lv_obj_get_child(s_status_food_icon, i), text, 0);
-        }
-    }
 }
 
 static void update_net_status(void)
@@ -406,12 +396,6 @@ void ui_close_app(void)
 
 /* ---------------------------------------------------------------- events -- */
 
-static void food_btn_cb(lv_event_t *e)
-{
-    (void)e;
-    ui_open_app(food_ui_open);
-}
-
 /* Step through the face list and remember where we landed, so the arrows and
  * the settings picker agree about which face is current. */
 static void nav_cb(lv_event_t *e)
@@ -631,47 +615,14 @@ static void build_status_bar(lv_obj_t *parent)
     lv_obj_center(s_status_gear_label);
 
     /*
-     * Food button, left of the gear.
-     *
-     * Drawn from rectangles because LVGL's symbol font has no cutlery glyph and
-     * the Ubuntu faces have nothing at those codepoints either - the same trap
-     * that made the settings gear invisible until it moved to the built-in font.
-     */
-    lv_obj_t *food = lv_button_create(s_status_bar);
-    lv_obj_remove_style_all(food);
-    lv_obj_set_size(food, 64, UI_STATUS_H);
-    lv_obj_align(food, LV_ALIGN_RIGHT_MID, -84, 0);
-    lv_obj_set_style_radius(food, 12, 0);
-    lv_obj_set_style_bg_opa(food, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_bg_opa(food, LV_OPA_10, LV_STATE_PRESSED);
-    lv_obj_set_style_bg_color(food, lv_color_hex(0x808080), LV_STATE_PRESSED);
-    lv_obj_add_event_cb(food, food_btn_cb, LV_EVENT_CLICKED, NULL);
-
-    s_status_food_icon = lv_obj_create(food);
-    lv_obj_remove_style_all(s_status_food_icon);
-    lv_obj_set_size(s_status_food_icon, 28, 28);
-    lv_obj_center(s_status_food_icon);
-    lv_obj_remove_flag(s_status_food_icon, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(s_status_food_icon, LV_OBJ_FLAG_SCROLLABLE);
-    /* fork: three tines, a neck, a stem */
-    ui_add_rect(s_status_food_icon, 2, 3, 2, 9, 0xFFFFFF, LV_OPA_COVER, 0);
-    ui_add_rect(s_status_food_icon, 6, 3, 2, 9, 0xFFFFFF, LV_OPA_COVER, 0);
-    ui_add_rect(s_status_food_icon, 10, 3, 2, 9, 0xFFFFFF, LV_OPA_COVER, 0);
-    ui_add_rect(s_status_food_icon, 2, 12, 10, 3, 0xFFFFFF, LV_OPA_COVER, 0);
-    ui_add_rect(s_status_food_icon, 6, 15, 3, 11, 0xFFFFFF, LV_OPA_COVER, 0);
-    /* knife: blade over handle */
-    ui_add_rect(s_status_food_icon, 19, 3, 5, 13, 0xFFFFFF, LV_OPA_COVER, 2);
-    ui_add_rect(s_status_food_icon, 20, 16, 3, 10, 0xFFFFFF, LV_OPA_COVER, 0);
-
-    /*
-     * DOOM, left of the cutlery. The marine's face from the status bar, drawn
+     * DOOM, left of the gear. The marine's face from the status bar, drawn
      * from rectangles at 28 px: hair, face, two eyes, a mouth. Crude, but it
      * reads at a glance and needs no image decoder or extra font.
      */
     lv_obj_t *doom = lv_button_create(s_status_bar);
     lv_obj_remove_style_all(doom);
     lv_obj_set_size(doom, 64, UI_STATUS_H);
-    lv_obj_align(doom, LV_ALIGN_RIGHT_MID, -152, 0);
+    lv_obj_align(doom, LV_ALIGN_RIGHT_MID, -84, 0);
     lv_obj_set_style_radius(doom, 12, 0);
     lv_obj_set_style_bg_opa(doom, LV_OPA_TRANSP, 0);
     lv_obj_set_style_bg_opa(doom, LV_OPA_10, LV_STATE_PRESSED);
@@ -693,7 +644,7 @@ static void build_status_bar(lv_obj_t *parent)
     s_status_net_label = lv_label_create(s_status_bar);
     lv_obj_set_style_text_font(s_status_net_label, ui_font(UI_FONT_MEDIUM, UI_TEXT_MD), 0);
     lv_label_set_text(s_status_net_label, "");
-    lv_obj_align(s_status_net_label, LV_ALIGN_RIGHT_MID, -228, 0);
+    lv_obj_align(s_status_net_label, LV_ALIGN_RIGHT_MID, -160, 0);
 }
 
 /* Until SNTP lands, the faces are drawing an epoch date. Say so plainly rather

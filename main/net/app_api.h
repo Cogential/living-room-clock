@@ -8,7 +8,8 @@ extern "C" {
 #endif
 
 /*
- * Live data from the example.com gateway.
+ * Live data from a data gateway (CLOCK_API_BASE in secrets.h; see the README
+ * for the endpoints it has to serve).
  *
  * A background task refreshes each feed on its own schedule and keeps the
  * parsed result in a small fixed-size struct. Nothing here allocates on behalf
@@ -96,33 +97,10 @@ typedef struct {
     char     fear_greed_rating[16];
 } api_markets_t;
 
-/*
- * Barcode lookup, on demand rather than on a schedule.
- *
- * app_food_request() returns immediately and does the fetch on a short-lived
- * task, so the UI can show a spinner instead of freezing for the round trip.
- */
-typedef struct {
-    bool  ok;        /* a lookup completed */
-    bool  found;     /* ...and the product existed */
-    char  code[16];
-    char  name[64];
-    char  brands[64];
-    char  nutriscore[4];
-    int   nova;
-    float energy_kcal, fat, saturated_fat, carbohydrates, sugars, proteins, salt;
-} api_food_t;
-
-/* False if the lookup was not started (no token, one already running, or no
- * memory for the task); the previous result is then left as it was. */
-bool app_food_request(const char *code);
-bool app_food_busy(void);
-bool app_food_result(api_food_t *out);
-
 /** Start the refresh task. Safe to call before Wi-Fi is up. */
 void app_api_start(void);
 
-/** False when no token was compiled in; the dashboard says so rather than spin. */
+/** False when no CLOCK_API_BASE was compiled in; the dashboard says so rather than spin. */
 bool app_api_configured(void);
 
 /**
