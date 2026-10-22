@@ -1,5 +1,5 @@
 /*
- * Pip-Boy - green phosphor CRT, monochrome throughout: sections are told apart
+ * Phosphor - green phosphor CRT, monochrome throughout: sections are told apart
  * by their headings rather than by colour. The blinking block cursor after the
  * time is the only thing that moves.
  */
@@ -30,7 +30,7 @@ static const ui_hud_theme_t THEME = {
     .secs_style = HUD_SECS_BAR, .secs = PHOS, .secs_track = PHOS, .secs_track_opa = LV_OPA_20,
 };
 
-static lv_obj_t *pipboy_create(lv_obj_t *parent)
+static lv_obj_t *phosphor_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -44,7 +44,7 @@ static lv_obj_t *pipboy_create(lv_obj_t *parent)
     return root;
 }
 
-static void pipboy_tick(const clock_time_t *now)
+static void phosphor_tick(const clock_time_t *now)
 {
     ui_hud_tick(now);
 
@@ -56,10 +56,10 @@ static void pipboy_tick(const clock_time_t *now)
     }
 }
 
-const clock_face_t face_pipboy = {
-    .name = "Pip-Boy",
+const clock_face_t face_phosphor = {
+    .name = "Phosphor",
     .light_chrome = true,
-    .create = pipboy_create,
-    .tick = pipboy_tick,
+    .create = phosphor_create,
+    .tick = phosphor_tick,
     .tap = ui_hud_tap,
 };

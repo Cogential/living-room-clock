@@ -1,5 +1,5 @@
 /*
- * Hyrule - gold on forest green, a small triangle motif crowning the clock and
+ * Grove - gold on forest green, a small triangle motif crowning the clock and
  * a gold seconds bar beneath it.
  */
 #include "ui/ui.h"
@@ -51,7 +51,7 @@ static void add_triangle(lv_obj_t *root, int cx, int top, uint32_t colour)
     lv_line_set_points(line, p, 4);
 }
 
-static lv_obj_t *hyrule_create(lv_obj_t *parent)
+static lv_obj_t *grove_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -69,10 +69,10 @@ static lv_obj_t *hyrule_create(lv_obj_t *parent)
     return root;
 }
 
-const clock_face_t face_hyrule = {
-    .name = "Hyrule",
+const clock_face_t face_grove = {
+    .name = "Grove",
     .light_chrome = true,
-    .create = hyrule_create,
+    .create = grove_create,
     .tick = ui_hud_tick,
     .tap = ui_hud_tap,
 };

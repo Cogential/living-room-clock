@@ -21,21 +21,21 @@ static const char *TAG = "ui";
 #define CHROME_IDLE_MS   8000   /* hide the dock after this much no-touch */
 /* The face a fresh install starts on. Resolved by name so the list can be
  * reordered without silently changing the default. */
-#define DEFAULT_FACE_NAME "Pip-Boy"
+#define DEFAULT_FACE_NAME "Phosphor"
 
 static const clock_face_t *const s_faces[] = {
     &face_dashboard,
     &face_photo,
     &face_minimal,
     &face_cyberpunk,
-    &face_outrun,
-    &face_pipboy,
+    &face_synthwave,
+    &face_phosphor,
     &face_rapture,
-    &face_stardew,
+    &face_harvest,
     &face_tavern,
-    &face_blockcraft,
-    &face_aperture,
-    &face_hyrule,
+    &face_voxel,
+    &face_lab,
+    &face_grove,
     &face_cuckoo,
 };
 #define FACE_COUNT ((int)(sizeof(s_faces) / sizeof(s_faces[0])))

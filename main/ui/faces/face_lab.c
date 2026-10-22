@@ -1,6 +1,6 @@
 /*
- * Aperture - clean test-chamber signage: white plates on a seamed wall, and the
- * two portal colours closing on the middle as the minute runs out.
+ * Lab - clean laboratory signage: white plates on a seamed wall, and two
+ * accent colours closing on the middle as the minute runs out.
  */
 #include "ui/ui.h"
 #include "ui/ui_hud.h"
@@ -25,7 +25,7 @@ static const ui_hud_theme_t THEME = {
     .secs_track = SEAM, .secs_track_opa = LV_OPA_COVER,
 };
 
-static lv_obj_t *aperture_create(lv_obj_t *parent)
+static lv_obj_t *lab_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -50,10 +50,10 @@ static lv_obj_t *aperture_create(lv_obj_t *parent)
     return root;
 }
 
-const clock_face_t face_aperture = {
-    .name = "Aperture",
+const clock_face_t face_lab = {
+    .name = "Lab",
     .light_chrome = false,
-    .create = aperture_create,
+    .create = lab_create,
     .tick = ui_hud_tick,
     .tap = ui_hud_tap,
 };

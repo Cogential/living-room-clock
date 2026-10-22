@@ -1,5 +1,5 @@
 /*
- * Stardew - a green field with the clock carved into a wooden sign and every
+ * Harvest - a green field with the clock carved into a wooden sign and every
  * feed on its own wooden board. The date reads "Fall 28", not 28/09.
  */
 #include <stdio.h>
@@ -14,7 +14,7 @@
 #define CREAM      0xF7E7C4
 #define GOLD       0xFFD166
 
-/* The game's 28-day seasons drift from the real calendar; mapping by month
+/* Farm-calendar seasons rather than the date; mapping by month
  * keeps it recognisable rather than accurate. */
 static const char *SEASONS[12] = {
     "Winter", "Winter", "Spring", "Spring", "Spring", "Summer",
@@ -41,7 +41,7 @@ static const ui_hud_theme_t THEME = {
     .secs_style = HUD_SECS_BAR, .secs = GOLD, .secs_track = 0x3B2716, .secs_track_opa = LV_OPA_60,
 };
 
-static lv_obj_t *stardew_create(lv_obj_t *parent)
+static lv_obj_t *harvest_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -59,11 +59,11 @@ static lv_obj_t *stardew_create(lv_obj_t *parent)
     return root;
 }
 
-const clock_face_t face_stardew = {
-    .name = "Stardew",
+const clock_face_t face_harvest = {
+    .name = "Harvest",
     /* Light: the icons land on the dark wood of the weather board. */
     .light_chrome = true,
-    .create = stardew_create,
+    .create = harvest_create,
     .tick = ui_hud_tick,
     .tap = ui_hud_tap,
 };

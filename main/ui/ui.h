@@ -42,14 +42,14 @@ typedef struct {
 /* The registered faces, in the order they appear in the picker. */
 extern const clock_face_t face_minimal;
 extern const clock_face_t face_cyberpunk;
-extern const clock_face_t face_outrun;
-extern const clock_face_t face_pipboy;
+extern const clock_face_t face_synthwave;
+extern const clock_face_t face_phosphor;
 extern const clock_face_t face_rapture;
-extern const clock_face_t face_stardew;
+extern const clock_face_t face_harvest;
 extern const clock_face_t face_tavern;
-extern const clock_face_t face_blockcraft;
-extern const clock_face_t face_aperture;
-extern const clock_face_t face_hyrule;
+extern const clock_face_t face_voxel;
+extern const clock_face_t face_lab;
+extern const clock_face_t face_grove;
 extern const clock_face_t face_cuckoo;
 extern const clock_face_t face_dashboard;
 extern const clock_face_t face_photo;

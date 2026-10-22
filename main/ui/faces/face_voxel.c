@@ -1,5 +1,5 @@
 /*
- * Blockcraft - daylight over a grass line. Square stone panels with a hard
+ * Voxel - daylight over a grass line. Square stone panels with a hard
  * offset shadow instead of a blur, blocky clouds, a strip of turf under the
  * clock.
  */
@@ -29,7 +29,7 @@ static const ui_hud_theme_t THEME = {
     .secs_track_opa = LV_OPA_20,
 };
 
-static lv_obj_t *blockcraft_create(lv_obj_t *parent)
+static lv_obj_t *voxel_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -54,11 +54,11 @@ static lv_obj_t *blockcraft_create(lv_obj_t *parent)
     return root;
 }
 
-const clock_face_t face_blockcraft = {
-    .name = "Blockcraft",
+const clock_face_t face_voxel = {
+    .name = "Voxel",
     /* Light: the icons land on the dark stone of the weather panel. */
     .light_chrome = true,
-    .create = blockcraft_create,
+    .create = voxel_create,
     .tick = ui_hud_tick,
     .tap = ui_hud_tap,
 };

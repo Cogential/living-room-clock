@@ -1,5 +1,5 @@
 /*
- * Outrun - a banded sunset sinking behind the clock onto a neon horizon, violet
+ * Synthwave - a banded sunset sinking behind the clock onto a neon horizon, violet
  * panels with hot accents.
  */
 #include "ui/ui.h"
@@ -30,7 +30,7 @@ static const ui_hud_theme_t THEME = {
     .secs_style = HUD_SECS_BAR, .secs = MAGENTA, .secs_track = DIM, .secs_track_opa = LV_OPA_20,
 };
 
-static lv_obj_t *outrun_create(lv_obj_t *parent)
+static lv_obj_t *synthwave_create(lv_obj_t *parent)
 {
     lv_obj_t *root = lv_obj_create(parent);
     ui_make_layer(root);
@@ -51,10 +51,10 @@ static lv_obj_t *outrun_create(lv_obj_t *parent)
     return root;
 }
 
-const clock_face_t face_outrun = {
-    .name = "Outrun",
+const clock_face_t face_synthwave = {
+    .name = "Synthwave",
     .light_chrome = true,
-    .create = outrun_create,
+    .create = synthwave_create,
     .tick = ui_hud_tick,
     .tap = ui_hud_tap,
 };
